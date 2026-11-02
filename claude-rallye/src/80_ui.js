@@ -167,7 +167,7 @@ const UI = {
         <input class="name" data-act="name" data-v="${i}" value="${escapeHtml(names[i])}" maxlength="14">
         <span class="keys">${humans === 1 && i === 0 ? 'Pfeiltasten oder WASD · Reset R · Checkpoint Leertaste' + (rules.powerups ? ' · Item Shift' : '') : KEYMAP[i].label + ' · Reset ' + KEYMAP[i].resetLabel + ' · Checkpoint ' + KEYMAP[i].cpLabel + (rules.powerups ? ' · Item ' + ITEM_LABELS[i] : '')}</span></div>
         <div class="row" style="margin:4px 0">${seg('cls' + i, CLASSES.map(c => c.name), p.cls).replace('class="seg"', 'class="seg small"')}</div>
-        <div class="clsdesc">${CLASSES[p.cls].desc}</div>
+        <div class="clsrow">${humans <= 2 ? `<canvas class="car3d" width="300" height="150" data-i="${i}"></canvas>` : ''}<div class="clsdesc">${CLASSES[p.cls].desc}</div></div>
         <div class="swatches" style="margin-top:8px">${COLORS.map((c, k) => `<span class="sw ${k === p.color ? 'on' : ''}" style="background:${c}" data-act="color${i}" data-v="${k}"></span>`).join('')}</div></div>`;
     }
     const startLabel = champ ? 'Championship starten' : trial ? 'Zeitfahren starten' : derby ? 'Derby starten' : elim ? 'Ausscheidung starten' : 'Rennen starten';
@@ -178,6 +178,61 @@ const UI = {
     const cv = $('scr-setup').querySelector('canvas.preview');
     if (cv) { const pv = trackPreview(curTrack); if (pv) cv.getContext('2d').drawImage(pv, 0, 0); }
     showScreen('scr-setup');
+    this.startSetupAnim(cv, derby || champ ? null : curTrack, humans);
+  },
+  /** Setup-Animation: Autos fahren über die Streckenvorschau, Fahrzeuge drehen sich in 3D. */
+  startSetupAnim(cv, trackId, humans) {
+    const token = this.animTok = (this.animTok || 0) + 1;
+    const st = Options.data.setup;
+    let path = null, tsrc = null;
+    if (cv && trackId) {
+      tsrc = getTrack(trackId);
+      if (tsrc && tsrc.aiLine && tsrc.aiLine.length > 4) {
+        path = resample(tsrc.aiLine, 6, true);
+        const c0 = tsrc.checkpoints && tsrc.checkpoints[0];
+        if (c0) { const i0 = nearestIndex(path, (c0.x1 + c0.x2) / 2, (c0.y1 + c0.y2) / 2); path = path.slice(i0).concat(path.slice(0, i0)); }
+      }
+    }
+    const pv = trackId ? trackPreview(trackId) : null;
+    const runners = [];
+    if (path) {
+      const cols = [COLORS[st.players[0].color], ...COLORS.filter((c, k) => k !== st.players[0].color).slice(0, 2)];
+      cols.forEach((col, k) => runners.push({ col, shape: CLASSES[k === 0 ? st.players[0].cls : (k * 3) % CLASSES.length].shape, off: k * 7, sp: 1 - k * 0.04 }));
+    }
+    const cars = [...document.querySelectorAll('#scr-setup canvas.car3d')];
+    const t0 = performance.now();
+    const step = now => {
+      if (token !== this.animTok || !document.getElementById('scr-setup').classList.contains('on')) return;
+      const t = (now - t0) / 1000;
+      if (path && pv && cv.isConnected) {
+        const g = cv.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(pv, 0, 0);
+        g.setTransform(448 / W, 0, 0, 280 / H, 0, 0);
+        const n = path.length;
+        const items = runners.map(r => {
+          const f = (t * 32 * r.sp + n - r.off) % n, i = Math.floor(f), j = (i + 1) % n, u = f - i;
+          const x = lerp(path[i].x, path[j].x, u), y = lerp(path[i].y, path[j].y, u);
+          const k2 = (i + 3) % n, a = Math.atan2(path[k2].y - path[i].y, path[k2].x - path[i].x);
+          const z = terrainH(tsrc, x, y);
+          return { x, y, a, z, gz: z, color: r.col, shape: r.shape, steer: 0, damage: 0, alpha: 1, level: 0 };
+        }).sort((p, q) => p.y - q.y);
+        for (const o of items) drawCar3D(g, o);
+        g.setTransform(1, 0, 0, 1, 0, 0);
+      }
+      for (const c of cars) {
+        if (!c.isConnected) continue;
+        const i = +c.dataset.i, p = st.players[i], g = c.getContext('2d');
+        g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, c.width, c.height);
+        const grd = g.createRadialGradient(150, 100, 10, 150, 100, 140); grd.addColorStop(0, '#2a3445'); grd.addColorStop(1, '#141a24');
+        g.fillStyle = grd; g.fillRect(0, 0, c.width, c.height);
+        g.fillStyle = 'rgba(0,0,0,.35)'; g.beginPath(); g.ellipse(150, 104, 78, 20, 0, 0, Math.PI * 2); g.fill();
+        const [px, py] = P(W / 2, H / 2, 0), k = 5;
+        g.setTransform(k, 0, 0, k, 150 - px * k, 100 - py * k);
+        drawCar3D(g, { x: W / 2, y: H / 2, a: t * 0.9 + i, z: 0, gz: 0, color: COLORS[p.color], shape: CLASSES[p.cls].shape, steer: Math.sin(t * 1.3) * 0.6, damage: 0, alpha: 1, level: 0 });
+        g.setTransform(1, 0, 0, 1, 0, 0);
+      }
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
   },
   setupAct(act, v, el) {
     const st = Options.data.setup, trial = this.mode === 'trial', rules = trial ? st.trialRules : st.rules;

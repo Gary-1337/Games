@@ -10,6 +10,7 @@ Im Projekt werden höchstens 3 Versionsstände aufbewahrt (aktuelle `index.html`
   - ?-Kisten in Reihen quer über die Fahrbahn, nach 4 s wieder da. Inhalt zufällig: **Nitro** (längerer Schub), **Öl** (Fleck hinter dem Auto, wer hineinfährt, rutscht), **Schild** (6 s: schützt vor Öl und dämpft Schaden). Hinten liegende Fahrer bekommen öfter Nitro und Schild.
   - Auslösen: Spieler 1 Shift rechts oder Strg rechts (allein auch Shift links oder F), Spieler 2 F, Spieler 3 H, Spieler 4 Num 0, Gamepad LB/RB, Touch ⚡-Knopf. Das Item steht in der Spielerkarte.
   - Die KI sammelt und nutzt Items (Nitro auf Geraden, Öl gegen Verfolger, Schild bei Gefahr).
+- **Bessere Menüs:** In der Streckenvorschau im Setup fahren drei Autos die Ideallinie ab. Bei 1–2 Spielern dreht sich das gewählte Auto (Klasse und Farbe) in 3D neben der Beschreibung.
 - Neuer Test `tests/powerups.py`.
 
 ## 1.7.0-beta3 (01.11.2026, in Arbeit)
