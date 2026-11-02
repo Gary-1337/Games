@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
+<title>Claude Rallye</title>
+<!--
+  CLAUDE RALLYE – Top-Down-Arcade-Rennspiel
+  Eine einzige Datei: HTML5 + Canvas + JavaScript, keine externen Abhängigkeiten außer Google Fonts.
+
+  ARCHITEKTUR (Kurzüberblick)
+  ---------------------------------------------------------------
+  1  Grundlagen       Konstanten, Mathe-Helfer, Zufall, Speicher (localStorage)
+  2  Oberflächen      Asphalt, Gras, Sand, Kies, Schnee, Eis, Wasser, Boxengasse, Curbs
+  3  Streckenmodell   Raster (320x200 Zellen à 4 px) + Objekte + Checkpoints + KI-Linie
+                      + Startplätze + Boxengasse; JSON-Export/Import (RLE-kodiert)
+  4  Auto-Werkzeuge   Checkpoints, KI-Linie, Startplätze automatisch berechnen
+  5  Beispielstrecken 5 prozedural erzeugte Kurse (Oval, Stadt, Wüste, Schnee, Technisch)
+  6  Strecken-Grafik  Bodenpixel mit Rauschen, Markierungen, Objekte, Baumkronen-Ebene
+  7  Audio            WebAudio-Synthese (Motoren, Quietschen, Crash, Countdown)
+  8  Eingabe          Tastatur für 4 Spieler + Gamepad API
+  9  Fahrzeuge        3 Klassen, Arcade-Physik mit Drift, Kollisionen, Schaden/Sprit/Reifen
+  10 KI               Ideallinie + Geschwindigkeitsprofil, 4 Stufen, Ausweichen, Boxenstopps
+  11 Rennen           Countdown, Checkpoints (Anti-Cheat), Positionen nach Renndistanz,
+                      Boxendienst, Ziel, Ergebnis, Bestenliste, Ghost-Car
+  12 Darstellung      Autos, Partikel, Bremsspuren, Seitenleiste mit HUD
+  13 Menüs            Hauptmenü, Rennsetup, Zeitfahren, Championship, Optionen, Bestenliste
+  14 Streckeneditor   Paint-Stil: Malen, Füllen, Objekte, Checkpoints, KI-Linie, Box, Start
+  15 Hauptschleife    Feste Physikschritte (120 Hz), Darstellung per requestAnimationFrame
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Russo+One&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0d1118; --panel:#151b26; --panel2:#1d2533; --panel3:#253044; --line:#2e3a50;
+  --text:#e9eef6; --muted:#8a97ad; --accent:#ff6a2b; --accent2:#38c4ff;
+  --good:#47d48a; --bad:#ff4d5e; --warn:#ffc83d;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#07090d;color:var(--text);
+  font-family:'Chakra Petch',system-ui,sans-serif;overflow:hidden;user-select:none;-webkit-user-select:none}
+#stage{position:absolute;left:0;top:0;width:1540px;height:800px;transform-origin:0 0;overflow:hidden;background:#000}
+#game{position:absolute;left:0;top:0;width:1540px;height:800px;display:block}
+button{font-family:inherit;cursor:pointer}
+input,select{font-family:inherit}
+
+/* ---------- Bildschirme ---------- */
+.screen{position:absolute;inset:0;display:none;z-index:10}
+.screen.on{display:block}
+.dim{position:absolute;inset:0;background:linear-gradient(120deg,rgba(7,9,13,.92),rgba(7,9,13,.7) 55%,rgba(7,9,13,.88))}
+.wrap{position:absolute;inset:0;padding:34px 44px}
+
+/* Hauptmenü */
+#scr-main .logo{position:absolute;left:80px;top:56px}
+.logo h1{font-family:'Russo One',sans-serif;font-size:92px;line-height:.9;margin:0;letter-spacing:2px;
+  color:#fff;text-shadow:0 6px 0 #b8401a,0 10px 30px rgba(255,106,43,.35)}
+.logo h1 span{color:var(--accent)}
+.logo .sub{margin-top:14px;font-size:20px;color:var(--muted);letter-spacing:6px;text-transform:uppercase}
+.mainmenu{position:absolute;left:80px;top:276px;display:flex;flex-direction:column;gap:6px;width:380px}
+.mbtn{display:flex;align-items:center;gap:14px;background:rgba(21,27,38,.85);border:1px solid var(--line);
+  color:var(--text);font-size:20px;font-weight:600;padding:8px 18px;border-radius:10px;text-align:left;
+  transition:transform .08s,background .12s,border-color .12s}
+.mbtn:hover,.mbtn:focus{background:var(--panel3);border-color:var(--accent);transform:translateX(6px);outline:none}
+.mbtn .ico{width:28px;text-align:center;color:var(--accent);font-size:20px}
+.mbtn small{display:block;font-size:13px;color:var(--muted);font-weight:400}
+.version{position:absolute;right:20px;bottom:14px;color:var(--muted);font-size:13px}
+.hint{position:absolute;left:80px;bottom:14px;color:var(--muted);font-size:14px}
+
+/* Setup & allgemeine Panels */
+.head{display:flex;align-items:center;gap:18px;margin-bottom:20px}
+.head h2{font-family:'Russo One',sans-serif;font-size:36px;margin:0;font-weight:400}
+.head .spacer{flex:1}
+.btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:9px 16px;border-radius:8px;font-size:16px;font-weight:600}
+.btn:hover{border-color:var(--accent2);background:var(--panel3)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#1a0d05}
+.btn.primary:hover{filter:brightness(1.1)}
+.btn.big{font-size:22px;padding:13px 30px}
+.btn.small{font-size:13px;padding:5px 10px}
+.btn.danger{border-color:#6b2a33;color:#ff9aa5}
+.btn:disabled{opacity:.4;cursor:default}
+.cols{display:flex;gap:22px;height:640px}
+.col{background:rgba(21,27,38,.92);border:1px solid var(--line);border-radius:12px;padding:16px;overflow:auto}
+.col h3{margin:0 0 12px;font-size:15px;letter-spacing:3px;text-transform:uppercase;color:var(--accent2)}
+.row{display:flex;align-items:center;gap:10px;margin:8px 0;min-height:34px}
+.row label.l{width:130px;color:var(--muted);font-size:15px;flex:none}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{background:var(--panel2);border:none;color:var(--muted);padding:6px 11px;font-size:14px;font-weight:600;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:none}
+.seg button.on{background:var(--accent2);color:#04121a}
+.seg.small button{padding:5px 8px;font-size:13px}
+.selbox{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:6px 10px;font-size:14px}
+.stepper{display:flex;align-items:center;gap:6px}
+.stepper button{width:30px;height:30px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:18px;line-height:1}
+.stepper span{min-width:36px;text-align:center;font-size:18px;font-weight:700}
+.tlist{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.titem{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);cursor:pointer;font-size:15px}
+.titem:hover{border-color:var(--accent2)}
+.titem.on{border-color:var(--accent);background:#2a2320}
+.titem .tag{margin-left:auto;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+.titem input{accent-color:var(--accent)}
+canvas.preview{width:100%;border-radius:8px;border:1px solid var(--line);display:block;margin-top:12px;background:#000}
+.tog{position:relative;width:46px;height:24px;border-radius:12px;background:#3a4559;border:none;flex:none}
+.tog::after{content:'';position:absolute;left:3px;top:3px;width:18px;height:18px;border-radius:50%;background:#cfd6e2;transition:left .12s}
+.tog.on{background:var(--good)}
+.tog.on::after{left:25px}
+input[type=range]{accent-color:var(--accent);width:140px}
+.pct{width:46px;text-align:right;font-variant-numeric:tabular-nums;color:var(--muted)}
+.prow{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px;background:var(--panel2)}
+.prow .top{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.prow .badge{font-weight:700;font-size:13px;padding:2px 8px;border-radius:6px;color:#000}
+.prow input.name{background:#0f141d;border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:15px;width:150px}
+.prow .keys{margin-left:auto;font-size:12px;color:var(--muted)}
+.swatches{display:flex;gap:5px;flex-wrap:wrap}
+.sw{width:22px;height:22px;border-radius:50%;border:2px solid transparent;cursor:pointer}
+.sw.on{border-color:#fff;box-shadow:0 0 0 2px #000 inset}
+.clsdesc{font-size:12px;color:var(--muted);margin-top:4px}
+.startbar{position:absolute;right:44px;bottom:26px;display:flex;gap:12px;align-items:center}
+.note{font-size:13px;color:var(--muted)}
+
+/* Tabellen */
+table.tbl{width:100%;border-collapse:collapse;font-size:16px}
+.tbl th{text-align:left;color:var(--muted);font-weight:500;font-size:13px;letter-spacing:1px;text-transform:uppercase;padding:6px 8px;border-bottom:1px solid var(--line)}
+.tbl td{padding:7px 8px;border-bottom:1px solid #222c3d;font-variant-numeric:tabular-nums}
+.tbl tr.me td{background:rgba(255,106,43,.08)}
+.tbl .pos{font-family:'Russo One',sans-serif;font-size:18px;width:40px}
+.chip{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:8px;vertical-align:-1px}
+.laps{font-size:12px;color:var(--muted);max-width:420px}
+.laps b{color:var(--good);font-weight:600}
+
+/* Pause */
+#scr-pause .box{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:380px;background:rgba(21,27,38,.96);
+  border:1px solid var(--line);border-radius:14px;padding:26px;display:flex;flex-direction:column;gap:10px}
+#scr-pause h2{font-family:'Russo One',sans-serif;margin:0 0 10px;text-align:center;font-weight:400;font-size:34px}
+
+/* Editor-Seitenleiste */
+#editor-ui{position:absolute;left:1280px;top:0;width:260px;height:800px;background:#121823;border-left:1px solid var(--line);
+  display:none;z-index:5;overflow-y:auto;padding:10px 10px 30px;font-size:13px}
+#editor-ui.on{display:block}
+#editor-ui h4{margin:12px 0 6px;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--accent2)}
+#editor-ui .tools{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+#editor-ui .tools button,#editor-ui .grid2 button{background:var(--panel2);border:1px solid var(--line);color:var(--text);
+  border-radius:6px;padding:6px 2px;font-size:12px;font-weight:600}
+#editor-ui .tools button.on{background:var(--accent);color:#1a0d05;border-color:var(--accent)}
+#editor-ui .grid2{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+#editor-ui .grid2 button:hover,#editor-ui .tools button:hover{border-color:var(--accent2)}
+#editor-ui .surfs{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+#editor-ui .surfs button{border:2px solid transparent;border-radius:6px;padding:6px 2px;font-size:11px;font-weight:700;color:#111}
+#editor-ui .surfs button.on{border-color:#fff;box-shadow:0 0 0 1px #000 inset}
+#editor-ui input[type=text],#editor-ui select{width:100%;background:#0f141d;border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 6px;font-size:13px}
+#editor-ui input[type=range]{width:100%}
+#editor-ui .info{color:var(--muted);font-size:12px;line-height:1.4;margin-top:6px}
+#editor-status{position:absolute;left:0;top:0;width:1280px;padding:6px 12px;background:rgba(10,13,19,.78);color:#dfe6f2;
+  font-size:14px;display:none;z-index:5;pointer-events:none}
+#editor-status.on{display:block}
+
+/* Toast */
+#toast{position:absolute;left:640px;top:60px;transform:translateX(-50%);z-index:50;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none}
+.toastmsg{background:rgba(15,20,29,.95);border:1px solid var(--accent);color:#fff;padding:9px 18px;border-radius:9px;font-size:16px;font-weight:600;
+  animation:tin .2s ease-out}
+@keyframes tin{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+
+/* Dialog */
+#dialog{position:absolute;inset:0;z-index:60;display:none;background:rgba(0,0,0,.55)}
+#dialog.on{display:block}
+#dialog .box{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);min-width:420px;max-width:620px;background:var(--panel);
+  border:1px solid var(--line);border-radius:12px;padding:22px}
+#dialog .box p{margin:0 0 18px;font-size:16px;line-height:1.45;white-space:pre-line}
+#dialog .acts{display:flex;justify-content:flex-end;gap:10px}
+.keytbl td{padding:4px 10px 4px 0;font-size:14px}
+.keytbl td:first-child{color:var(--muted)}
+kbd{background:#0f141d;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;font-family:inherit;font-size:12px}
+
+/* Karriere */
+.moneybox{font-family:'Russo One',sans-serif;font-size:24px;color:#ffd23e;background:rgba(255,210,62,.08);border:1px solid rgba(255,210,62,.35);border-radius:8px;padding:4px 14px}
+.lcard{background:rgba(21,27,38,.85);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:10px}
+.lcard.cur{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.lcard.locked{opacity:.55}
+.lcard .lhead b{font-size:17px;margin-right:8px}
+.lcard .evs{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.lcard .ev{font-size:12px;background:#0f141d;border:1px solid var(--line);border-radius:5px;padding:3px 7px;color:#c4ccd9}
+.lcard .ev i{color:var(--accent);font-style:normal}
+.lcard .ev.done{border-color:#2e6b4b;color:#8fe0b0}
+.lcard .lact{display:flex;gap:8px;justify-content:flex-end;align-items:center}
+.gcar{display:flex;justify-content:space-between;align-items:center;gap:10px;background:rgba(15,20,29,.8);border:1px solid var(--line);border-radius:7px;padding:7px 10px;margin-bottom:6px}
+.gcar.on{border-color:var(--accent)}
+.gcar.locked{opacity:.5}
+.gcar .note{font-size:12px}
+.gcar .btn{white-space:nowrap}
+#scr-career .col{overflow-y:auto}
+.tag.on{font-size:12px;color:var(--accent);font-weight:700;text-transform:uppercase;letter-spacing:1px}
+.careermsg{background:rgba(255,210,62,.08);border:1px solid rgba(255,210,62,.3);border-radius:8px;padding:10px 14px;margin:10px 0;font-size:16px}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+
+/* Touch-Steuerung */
+#touch{position:absolute;left:0;top:0;width:1280px;height:800px;display:none;z-index:20;pointer-events:none;touch-action:none}
+#touch.on{display:block}
+#touch .tz{position:absolute;bottom:18px;height:230px;display:flex;gap:14px;pointer-events:auto;touch-action:none}
+#tz-steer{left:18px;width:420px}
+#tz-pedal{right:18px;width:440px}
+#touch .tb{flex:1;border-radius:22px;background:rgba(10,14,20,.16);border:2px solid rgba(255,255,255,.22);color:rgba(255,255,255,.75);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;font:700 54px 'Chakra Petch',sans-serif;user-select:none;-webkit-user-select:none}
+#tz-pedal .tb{font-size:30px;letter-spacing:2px}
+#tz-pedal .tb small{font-size:13px;font-weight:500;opacity:.7;letter-spacing:0;margin-top:4px}
+#touch .tb.gas{flex:1.3;border-color:rgba(70,214,138,.5)}
+#touch .tb.on{background:rgba(255,106,43,.45);border-color:#ff6a2b;color:#fff}
+#touch .tsmall{position:absolute;left:18px;width:84px;height:84px;border-radius:50%;pointer-events:auto;touch-action:none;background:rgba(10,14,20,.45);
+  border:2px solid rgba(255,255,255,.3);color:#fff;display:flex;align-items:center;justify-content:center;font:700 36px 'Chakra Petch',sans-serif;user-select:none;-webkit-user-select:none}
+#t-pause{top:150px}
+#t-reset{top:250px}
+#t-cp{top:350px}
+#touch .tsmall.on{background:rgba(255,106,43,.6)}
+#stage,#game{touch-action:none}
+#rotate{display:none}
+@media (orientation: portrait) and (pointer: coarse){
+  #rotate{display:flex;position:fixed;inset:0;z-index:100;background:#07090d;color:#e9eef6;align-items:center;justify-content:center;flex-direction:column;gap:14px;font:600 22px 'Chakra Petch',sans-serif;text-align:center;padding:30px}
+  #rotate b{font-size:64px}
+}
+.fsbtn{position:absolute;right:24px;top:20px}
+.seg.small{flex-wrap:wrap}
+</style>
+</head>
+<body>
+<div id="rotate"><b>⟳</b>Bitte das Gerät quer halten.</div>
+<div id="stage">
+  <canvas id="game" width="1540" height="800"></canvas>
+  <div id="editor-status"></div>
+  <div id="editor-ui"></div>
+  <div class="screen" id="scr-main"></div>
+  <div class="screen" id="scr-setup"></div>
+  <div class="screen" id="scr-results"></div>
+  <div class="screen" id="scr-champ"></div>
+  <div class="screen" id="scr-options"></div>
+  <div class="screen" id="scr-board"></div>
+  <div class="screen" id="scr-pause"></div>
+  <div class="screen" id="scr-career"></div>
+  <div id="toast"></div>
+  <div id="dialog"><div class="box"><p id="dlg-text"></p><div class="acts" id="dlg-acts"></div></div></div>
+  <input type="file" id="file-import" accept=".json,application/json" style="display:none">
+</div>
+<script>
+'use strict';

@@ -1,0 +1,2909 @@
+<!DOCTYPE html>
+<html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#2b1b4f">
+<title>Treppen-Chaos 3D</title>
+<style>
+/* =========================================================
+   Treppen-Chaos – Stylesheet
+   Retro-Cartoon-Look: dicke Konturen, Sticker-Schatten, kräftige Farben
+   ========================================================= */
+:root {
+  --ink: #1b1030;
+  --paper: #fff6df;
+  --yellow: #ffd23f;
+  --pink: #ff4f8b;
+  --cyan: #3fd0ff;
+  --orange: #ff8a3d;
+  --green: #4fdc7a;
+  --purple: #5b3cc4;
+  --bg: #2b1b4f;
+  --shadow: 4px 4px 0 var(--ink);
+  --font: "Trebuchet MS", "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0; height: 100%; overflow: hidden; background: var(--bg);
+  font-family: var(--font); color: var(--ink);
+  user-select: none; -webkit-user-select: none; touch-action: none;
+}
+#app { position: fixed; inset: 0; overflow: hidden; }
+#game { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+#overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+/* ---------- allgemeine Bausteine ---------- */
+.btn {
+  font: inherit; font-weight: 900; font-size: 17px; letter-spacing: .3px;
+  color: var(--ink); background: var(--yellow);
+  border: 3px solid var(--ink); border-radius: 12px; box-shadow: var(--shadow);
+  padding: 10px 16px; cursor: pointer; touch-action: manipulation;
+  transition: transform .06s, box-shadow .06s;
+}
+.btn:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 var(--ink); }
+.btn.pink { background: var(--pink); color: #fff; }
+.btn.cyan { background: var(--cyan); }
+.btn.green { background: var(--green); }
+.btn.ghost { background: var(--paper); }
+.btn.small { font-size: 14px; padding: 6px 10px; border-radius: 10px; }
+.btn.icon { width: 46px; height: 46px; padding: 0; font-size: 21px; display: grid; place-items: center; }
+.card {
+  background: var(--paper); border: 4px solid var(--ink); border-radius: 18px;
+  box-shadow: 6px 6px 0 var(--ink);
+}
+.hidden { display: none !important; }
+
+/* ---------- HUD oben ---------- */
+#hud {
+  position: absolute; left: 0; right: 0; top: 0; padding: 10px 12px;
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
+  pointer-events: none;
+}
+#hud > * { pointer-events: auto; }
+#hudLeft { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+#hudInfo {
+  font-weight: 800; font-size: 13px; background: rgba(255,246,223,.92);
+  border: 3px solid var(--ink); border-radius: 10px; padding: 4px 9px;
+  box-shadow: 3px 3px 0 var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 46vw;
+}
+#scoreBox {
+  font-weight: 900; font-size: 30px; line-height: 1; color: var(--yellow);
+  -webkit-text-stroke: 2px var(--ink); paint-order: stroke fill;
+  text-shadow: 3px 3px 0 var(--ink); letter-spacing: 1px;
+}
+#scoreBox small { font-size: 14px; color: #fff; -webkit-text-stroke: 1px var(--ink); }
+#hudRight { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+#btnCam { width: auto; padding: 0 10px; font-size: 14px; gap: 4px; display: flex; align-items: center; }
+
+/* Combo-Banner in der Mitte oben */
+#comboBox {
+  position: absolute; left: 50%; top: 104px; transform: translateX(-50%) rotate(-4deg);
+  font-weight: 900; font-size: clamp(22px, 5vw, 40px); color: var(--pink);
+  -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; text-shadow: 4px 4px 0 var(--ink);
+  pointer-events: none; white-space: nowrap; opacity: 0;
+}
+#comboBox.show { animation: comboPop .45s cubic-bezier(.2,1.6,.4,1) forwards; }
+@keyframes comboPop {
+  0% { opacity: 0; transform: translateX(-50%) rotate(-4deg) scale(.3); }
+  100% { opacity: 1; transform: translateX(-50%) rotate(-4deg) scale(1); }
+}
+#comboBox.fade { transition: opacity .5s; opacity: 0 !important; animation: none; }
+
+/* Replay-Leiste */
+#replayBar {
+  position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 12px;
+  background: var(--paper); border: 3px solid var(--ink); border-radius: 14px; box-shadow: var(--shadow);
+  padding: 8px 10px 8px 16px; font-weight: 900;
+}
+#replayBar .rec { color: #e01e3c; animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: .2; } }
+
+/* Während des Sturzes: Abbrechen-Button unten */
+#fallBar { position: absolute; right: 12px; bottom: 14px; display: flex; gap: 8px; }
+
+/* ---------- Ziel-Panel unten ---------- */
+#aimPanel {
+  position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%);
+  width: min(760px, calc(100% - 16px));
+  padding: 10px 12px 12px; display: grid; gap: 8px;
+  grid-template-columns: 1fr 1fr; grid-template-areas: "zone angle" "powerups powerups" "power power";
+}
+#aimPanel label { font-weight: 900; font-size: 13px; display: block; margin-bottom: 3px; }
+.zoneWrap { grid-area: zone; }
+.angleWrap { grid-area: angle; }
+#zoneSel {
+  width: 100%; font: inherit; font-weight: 800; font-size: 16px; padding: 7px 8px;
+  border: 3px solid var(--ink); border-radius: 10px; background: #fff; color: var(--ink);
+}
+.angleRow { display: flex; align-items: center; gap: 8px; }
+#angleVal { font-weight: 900; min-width: 50px; text-align: right; font-size: 16px; }
+input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 30px; background: transparent; touch-action: none; }
+input[type=range]::-webkit-slider-runnable-track { height: 12px; background: var(--ink); border-radius: 8px; }
+input[type=range]::-moz-range-track { height: 12px; background: var(--ink); border-radius: 8px; }
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 26px; height: 26px; margin-top: -7px; border-radius: 50%;
+  background: var(--cyan); border: 3px solid var(--ink);
+}
+input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: var(--cyan); border: 3px solid var(--ink); }
+#powerups { grid-area: powerups; display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+#powerups::-webkit-scrollbar { display: none; }
+.chip {
+  flex: 0 0 auto; font: inherit; font-weight: 800; font-size: 13px; color: var(--ink);
+  background: #fff; border: 3px solid var(--ink); border-radius: 999px; padding: 6px 11px;
+  cursor: pointer; touch-action: manipulation; white-space: nowrap;
+}
+.chip.on { background: var(--green); box-shadow: inset 0 -3px 0 rgba(0,0,0,.2); }
+#powerBtn {
+  grid-area: power; position: relative; overflow: hidden; height: 62px;
+  font-size: 20px; background: #fff; display: grid; place-items: center; touch-action: none;
+}
+#powerFill {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 0%;
+  background: linear-gradient(90deg, var(--green), var(--yellow) 55%, var(--orange) 80%, #ff2d55);
+}
+#powerTicks {
+  position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 2px), rgba(27,16,48,.25) calc(10% - 2px) 10%);
+}
+#powerLabel { position: relative; z-index: 1; text-shadow: 0 2px 0 #fff; }
+#powerBtn.charging { animation: wobble .25s infinite alternate; }
+@keyframes wobble { from { transform: rotate(-.6deg); } to { transform: rotate(.6deg); } }
+
+/* ---------- Overlays (Menü, Ergebnis, Bestenliste) ---------- */
+.overlay {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  padding: 14px; background: rgba(27,16,48,.55); overflow-y: auto; touch-action: pan-y;
+}
+.overlay .card { width: min(900px, 100%); max-height: 100%; overflow-y: auto; padding: 18px 20px 20px; touch-action: pan-y; }
+.overlay h2 { margin: 14px 0 8px; font-size: 18px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; }
+
+/* Titel-Logo: Buchstaben „fallen“ die Treppe hinunter */
+.logo { text-align: center; margin: 4px 0 4px; line-height: 1; }
+.logo .word { display: inline-block; white-space: nowrap; }
+.logo span.l {
+  display: inline-block; font-weight: 900; font-size: clamp(34px, 7.5vw, 66px);
+  color: var(--yellow); -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill;
+  text-shadow: 4px 4px 0 var(--ink); animation: tumble 3.2s ease-in-out infinite;
+}
+.logo .sub {
+  display: inline-block; margin-top: 6px; font-weight: 900; font-size: clamp(15px, 3.2vw, 22px);
+  background: var(--pink); color: #fff; border: 3px solid var(--ink); border-radius: 10px;
+  padding: 3px 12px; transform: rotate(-2deg); box-shadow: 3px 3px 0 var(--ink);
+}
+@keyframes tumble { 0%, 80%, 100% { transform: translateY(0) rotate(0); } 88% { transform: translateY(-6px) rotate(-8deg); } }
+
+.grid { display: grid; gap: 10px; }
+.levels { grid-template-columns: repeat(4, 1fr); }
+.dummies { grid-template-columns: repeat(6, 1fr); }
+.pick {
+  font: inherit; text-align: left; color: var(--ink); cursor: pointer;
+  background: #fff; border: 3px solid var(--ink); border-radius: 14px; padding: 9px 10px;
+  box-shadow: 3px 3px 0 var(--ink); touch-action: manipulation; min-width: 0;
+}
+.pick .ico { font-size: 28px; line-height: 1; }
+.pick b { display: block; font-size: 15px; margin: 4px 0 2px; }
+.pick small { display: block; font-size: 12px; line-height: 1.25; opacity: .85; }
+.pick.sel { background: var(--cyan); transform: translate(-2px, -2px); box-shadow: 5px 5px 0 var(--ink); }
+.opts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; align-items: center; }
+.opt { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 14px; }
+.opt .lbl { min-width: 64px; }
+.toggle {
+  font: inherit; font-weight: 900; font-size: 13px; border: 3px solid var(--ink); border-radius: 999px;
+  padding: 5px 12px; background: #fff; cursor: pointer; color: var(--ink); touch-action: manipulation;
+}
+.toggle.on { background: var(--green); }
+.menuButtons { display: flex; gap: 12px; justify-content: center; margin-top: 18px; flex-wrap: wrap; }
+.menuButtons .btn { font-size: 20px; padding: 13px 26px; }
+#result .menuButtons {
+  position: sticky; bottom: -20px; margin: 14px -20px -20px; padding: 12px 10px 14px;
+  background: linear-gradient(rgba(255,246,223,0), var(--paper) 30%); z-index: 2;
+}
+#result .menuButtons .btn { font-size: 17px; padding: 10px 16px; }
+.foot { text-align: center; font-size: 12px; opacity: .7; margin-top: 12px; font-weight: 700; }
+details.help { margin-top: 12px; font-size: 14px; background: #fff; border: 3px solid var(--ink); border-radius: 12px; padding: 8px 12px; }
+details.help summary { font-weight: 900; cursor: pointer; }
+details.help ul { margin: 8px 0 2px; padding-left: 20px; line-height: 1.45; }
+
+/* ---------- Ergebnis ---------- */
+.resHead { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.resHead h1 { margin: 0; font-size: clamp(22px, 4.5vw, 32px); font-weight: 900; }
+.stamp {
+  font-weight: 900; color: #e01e3c; border: 4px solid #e01e3c; border-radius: 8px;
+  padding: 2px 10px; transform: rotate(-8deg); font-size: 18px; letter-spacing: 2px;
+}
+.resBody { display: grid; grid-template-columns: 200px 1fr; gap: 16px; margin-top: 10px; }
+#silhouette { width: 200px; height: 330px; background: #fff; border: 3px solid var(--ink); border-radius: 14px; }
+.total {
+  font-size: clamp(38px, 8vw, 58px); font-weight: 900; color: var(--yellow); line-height: 1;
+  -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; text-shadow: 4px 4px 0 var(--ink);
+}
+.newRecord {
+  display: inline-block; margin-left: 8px; vertical-align: middle; font-weight: 900; font-size: 14px;
+  background: var(--pink); color: #fff; border: 3px solid var(--ink); border-radius: 8px; padding: 2px 8px;
+  animation: tumble 1.2s infinite;
+}
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0; }
+.stat { background: #fff; border: 3px solid var(--ink); border-radius: 12px; padding: 6px 8px; }
+.stat small { display: block; font-size: 11px; font-weight: 800; opacity: .7; text-transform: uppercase; }
+.stat b { font-size: 17px; }
+table.zones { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.zones th.num { text-align: right; }
+table.zones th { text-align: left; font-size: 11px; text-transform: uppercase; opacity: .7; padding: 2px 4px; }
+table.zones td { padding: 3px 4px; border-top: 2px dashed rgba(27,16,48,.18); font-weight: 700; }
+table.zones td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.bar { height: 10px; background: rgba(27,16,48,.12); border-radius: 6px; overflow: hidden; min-width: 50px; }
+.bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--yellow), var(--orange), #ff2d55); }
+.medical {
+  margin-top: 12px; background: #eafcff; border: 3px solid var(--ink); border-radius: 12px; padding: 10px 12px;
+  font-size: 15px; line-height: 1.4;
+}
+.medical b { display: block; margin-bottom: 4px; }
+.medical p { margin: 4px 0; }
+.badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.badge {
+  font-weight: 900; font-size: 13px; background: var(--yellow); border: 3px solid var(--ink);
+  border-radius: 999px; padding: 4px 10px; box-shadow: 2px 2px 0 var(--ink);
+}
+.badge.locked { background: #ddd; opacity: .55; box-shadow: none; }
+
+/* ---------- Bestenliste ---------- */
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0 10px; }
+.tab { font: inherit; font-weight: 900; border: 3px solid var(--ink); border-radius: 10px; background: #fff; padding: 6px 12px; cursor: pointer; color: var(--ink); }
+.tab.sel { background: var(--cyan); }
+.boards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.board { background: #fff; border: 3px solid var(--ink); border-radius: 12px; padding: 8px 10px; }
+.board b { display: block; margin-bottom: 4px; }
+.board ol { margin: 0; padding-left: 22px; font-size: 14px; font-weight: 700; }
+.board li span { opacity: .6; font-size: 11px; font-weight: 600; }
+.board .empty { font-size: 13px; opacity: .6; }
+
+/* Toasts für Erfolge */
+#toasts { position: absolute; left: 50%; top: 168px; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; }
+.toast {
+  font-weight: 900; background: var(--yellow); border: 3px solid var(--ink); border-radius: 14px;
+  box-shadow: var(--shadow); padding: 8px 14px; animation: toastIn .35s cubic-bezier(.2,1.6,.4,1), toastOut .4s 2.6s forwards;
+  white-space: nowrap;
+}
+@keyframes toastIn { from { transform: scale(.4); opacity: 0; } }
+@keyframes toastOut { to { transform: translateY(-20px); opacity: 0; } }
+
+/* Hinweis bei Audio-Start */
+#hint {
+  position: absolute; left: 50%; bottom: 84px; max-width: calc(100% - 24px); white-space: normal !important; transform: translateX(-50%); pointer-events: none;
+  font-weight: 900; font-size: 14px; color: #fff; text-shadow: 2px 2px 0 var(--ink); text-align: center;
+  white-space: nowrap;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 760px) {
+  .levels { grid-template-columns: repeat(2, 1fr); }
+  .dummies { grid-template-columns: repeat(3, 1fr); }
+  .opts { grid-template-columns: 1fr; }
+  .resBody { grid-template-columns: 1fr; }
+  #silhouette { margin: 0 auto; display: block; width: 170px; height: 280px; }
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .pick small { font-size: 11px; }
+  #scoreBox { font-size: 24px; }
+  .btn.icon { width: 40px; height: 40px; font-size: 18px; }
+  #hudInfo { max-width: 40vw; font-size: 12px; }
+}
+@media (max-height: 520px) and (orientation: landscape) {
+  /* Querformat am Handy: Ziel-Panel kompakter */
+  #aimPanel {
+    grid-template-columns: 1fr 1fr 1.2fr; grid-template-areas: "zone angle power" "powerups powerups power";
+    padding: 6px 10px 8px; gap: 6px; width: min(860px, calc(100% - 12px)); bottom: 6px;
+  }
+  #powerBtn { height: auto; }
+  #zoneSel { padding: 4px 6px; font-size: 14px; }
+  .chip { padding: 4px 9px; font-size: 12px; }
+  #comboBox { top: 54px; }
+}
+</style>
+</head><body>
+<div id="app">
+  <canvas id="game"></canvas>
+  <canvas id="overlay"></canvas>
+
+  <!-- ===== HUD ===== -->
+  <div id="hud" class="hidden">
+    <div id="hudLeft">
+      <div id="hudInfo">–</div>
+      <div id="scoreBox">0 <small>Punkte</small></div>
+    </div>
+    <div id="hudRight">
+      <button class="btn icon ghost" id="btnCam" title="Kamera wechseln (C)">🎥 <span id="camLabel">Verfolger</span></button>
+      <button class="btn icon ghost" id="btnSound" title="Ton an/aus">🔊</button>
+      <button class="btn icon ghost" id="btnReset" title="Neu aufstellen (R)">↺</button>
+      <button class="btn icon ghost" id="btnMenu" title="Hauptmenü (Esc)">☰</button>
+    </div>
+  </div>
+  <div id="comboBox"></div>
+  <div id="hint"></div>
+  <div id="toasts"></div>
+
+  <!-- ===== Ziel-Panel ===== -->
+  <div id="aimPanel" class="card hidden">
+    <div class="zoneWrap">
+      <label for="zoneSel">Körperstelle <span style="opacity:.6">(oder Puppe antippen)</span></label>
+      <select id="zoneSel"></select>
+    </div>
+    <div class="angleWrap">
+      <label for="angle">Winkel <span style="opacity:.6">(oder Puppe ziehen)</span></label>
+      <div class="angleRow"><input type="range" id="angle" min="-100" max="100" step="1" value="10"><span id="angleVal">10°</span></div>
+    </div>
+    <div id="powerups"></div>
+    <button class="btn" id="powerBtn"><div id="powerFill"></div><div id="powerTicks"></div><span id="powerLabel">GEDRÜCKT HALTEN – LOSLASSEN = SCHUBS!</span></button>
+  </div>
+
+  <div id="fallBar" class="hidden">
+    <button class="btn small ghost" id="btnSkip">⏭ Weiter</button>
+  </div>
+
+
+  <div id="replayBar" class="hidden">
+    <span><span class="rec">●</span> REPLAY</span>
+    <button class="btn small" id="btnReplaySkip">Beenden</button>
+  </div>
+
+  <!-- ===== Startbildschirm ===== -->
+  <div id="menu" class="overlay">
+    <div class="card">
+      <div class="logo" id="logo"></div>
+      <h2>Treppe</h2>
+      <div class="grid levels" id="levelPicks"></div>
+      <h2>Testpuppe</h2>
+      <div class="grid dummies" id="dummyPicks"></div>
+      <h2>Einstellungen</h2>
+      <div class="opts">
+        <div class="opt"><span class="lbl">🎵 Musik</span><input type="range" id="volMusic" min="0" max="100" value="45"></div>
+        <div class="opt"><span class="lbl">💥 Sound</span><input type="range" id="volSfx" min="0" max="100" value="80"></div>
+        <div class="opt"><button class="toggle on" id="optSlowmo">AN</button> Zeitlupe beim ersten großen Aufprall</div>
+        <div class="opt"><button class="toggle on" id="optEvents">AN</button> Zufallsereignisse (Bowlingkugel, Banane …)</div>
+      </div>
+      <div class="menuButtons">
+        <button class="btn pink" id="btnStart">▶ Spiel starten</button>
+        <button class="btn cyan" id="btnScoresMenu">🏆 Bestenliste</button>
+      </div>
+      <details class="help">
+        <summary>So geht's</summary>
+        <ul>
+          <li><b>Körperstelle wählen:</b> Puppe antippen oder Liste nutzen (Taste Tab).</li>
+          <li><b>Winkel:</b> Puppe oder Pfeil mit Maus/Finger ziehen, Regler oder Pfeiltasten (−100° nach unten … +100° nach oben).</li>
+          <li><b>Kamera drehen:</b> auf freier Fläche ziehen, zoomen mit Mausrad oder zwei Fingern. Wände, die im Weg sind, werden durchsichtig.</li>
+          <li><b>Kraft:</b> Kraftknopf (oder Leertaste) gedrückt halten – die Leiste pulsiert. Im richtigen Moment loslassen!</li>
+          <li>Kopf, Hals und Gelenke bringen am meisten. Treppenabsätze und Kanten tun besonders weh. Schnelle Treffer hintereinander geben Combos.</li>
+          <li><b>Power-Ups</b> vor dem Wurf zuschalten. Nach dem Sturz: Replay (Kamera dabei frei drehbar).</li>
+          <li><b>C</b> Kameramodus (setzt das Drehen zurück) · <b>R</b> Neu aufstellen · <b>Esc</b> Menü</li>
+        </ul>
+      </details>
+      <div class="foot" id="versionFoot"></div>
+    </div>
+  </div>
+
+  <!-- ===== Ergebnis ===== -->
+  <div id="result" class="overlay hidden">
+    <div class="card">
+      <div class="resHead">
+        <h1>📋 Schadensbericht</h1>
+        <div class="stamp" id="resStamp">BEGUTACHTET</div>
+      </div>
+      <div class="resBody">
+        <canvas id="silhouette" width="400" height="660"></canvas>
+        <div>
+          <div><span class="total" id="resTotal">0</span><span id="resRecord"></span></div>
+          <div style="font-weight:800;opacity:.75" id="resSub"></div>
+          <div class="stats" id="resStats"></div>
+          <table class="zones"><thead><tr><th>Körperteil</th><th class="num">Punkte</th><th class="num">%</th><th class="num">Treffer</th><th></th></tr></thead><tbody id="resZones"></tbody></table>
+        </div>
+      </div>
+      <div class="medical" id="resMedical"></div>
+      <div class="badges" id="resBadges"></div>
+      <div class="menuButtons">
+        <button class="btn pink" id="btnAgain">↺ Nochmal</button>
+        <button class="btn cyan" id="btnReplay">🎬 Replay</button>
+        <button class="btn" id="btnScores">🏆 Highscore</button>
+        <button class="btn ghost" id="btnResMenu">☰ Menü</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Bestenliste ===== -->
+  <div id="scores" class="overlay hidden">
+    <div class="card">
+      <div class="resHead"><h1>🏆 Bestenliste</h1><button class="btn small ghost" id="btnScoresBack">Zurück</button></div>
+      <div class="tabs" id="scoreTabs"></div>
+      <div class="boards" id="scoreBoards"></div>
+      <h2>Erfolge <span id="achCount" style="opacity:.6"></span></h2>
+      <div class="badges" id="achList"></div>
+    </div>
+  </div>
+</div>
+<div id="loadErr" style="display:none;position:fixed;inset:0;background:#2b1b4f;color:#fff;font:700 18px sans-serif;padding:30px;text-align:center;z-index:99">Die 3D-Bibliotheken (three.js, cannon-es) konnten nicht geladen werden.<br>Beim ersten Start wird eine Internetverbindung benötigt.</div>
+<script>setTimeout(function(){if(!window.TC)document.getElementById("loadErr").style.display="block"},8000)</script>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+import * as CANNON from 'https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js';
+/* =========================================================
+   Treppen-Chaos 3D: Ragdoll Dismount
+   Ein physikbasiertes Slapstick-Treppensturz-Spiel in 3D (Low-Poly).
+   Physik: cannon-es · Grafik: three.js · Ton: Web Audio API
+   ========================================================= */
+
+const VERSION = '1.3.0';
+
+
+/* ---------- kleine Helfer ---------- */
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const lerp = (a, b, t) => a + (b - a) * t;
+const rnd = (a = 0, b = 1) => a + Math.random() * (b - a);
+const pick = (arr) => arr[(Math.random() * arr.length) | 0];
+const fmt = (n) => Math.round(n).toLocaleString('de-AT');
+const $ = (id) => document.getElementById(id);
+
+/** Deterministischer Zufallsgenerator (für Level-Deko, die bei jedem Bild gleich aussehen muss). */
+function mulberry32(seed) {
+  return function () {
+    seed |= 0; seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* ---------- Speicher (localStorage, robust gegen gesperrten Speicher) ---------- */
+const STORE_KEY = 'treppenChaos3d.v1';
+const Store = {
+  data: { scores: {}, achievements: {}, settings: {} },
+  load() {
+    try {
+      const raw = localStorage.getItem(STORE_KEY);
+      if (raw) Object.assign(this.data, JSON.parse(raw));
+    } catch (e) { /* privater Modus o. ä. – dann eben ohne Speicher */ }
+    this.data.scores ||= {}; this.data.achievements ||= {}; this.data.settings ||= {};
+  },
+  save() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(this.data)); } catch (e) { /* ignorieren */ }
+  },
+  /** Trägt einen Score ein und liefert den Rang (1 = neuer Rekord) oder 0. */
+  addScore(levelId, dummyId, entry) {
+    const s = this.data.scores;
+    s[levelId] ||= {};
+    const list = (s[levelId][dummyId] ||= []);
+    list.push(entry);
+    list.sort((a, b) => b.score - a.score);
+    list.length = Math.min(list.length, 10);
+    this.save();
+    const rank = list.indexOf(entry) + 1;
+    return rank;
+  },
+  best(levelId, dummyId) {
+    const l = this.data.scores[levelId]?.[dummyId];
+    return l && l.length ? l[0].score : 0;
+  },
+};
+/* =========================================================
+   AUDIO – alles synthetisch mit der Web Audio API
+   Startet erst nach der ersten Nutzerinteraktion (Autoplay-Regeln).
+   ========================================================= */
+const Sound = {
+  ctx: null, master: null, sfx: null, music: null, noiseBuf: null,
+  musicVol: 0.45, sfxVol: 0.8, muted: false,
+  lastVoice: 0, lastCrunch: 0, hitBudget: 0, hitBudgetT: 0,
+  loops: {},          // laufende Dauergeräusche (Ventilator, Kugel-Rollen)
+  music_: null,       // Musik-Sequencer-Zustand
+
+  /** Wird beim ersten Tippen/Klicken/Tastendruck aufgerufen. */
+  unlock() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    const ctx = (this.ctx = new AC());
+    this.master = ctx.createGain();
+    // sanfter Kompressor, damit viele Aufpralle nicht übersteuern
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -14; comp.knee.value = 10; comp.ratio.value = 5;
+    comp.attack.value = 0.003; comp.release.value = 0.2;
+    this.master.connect(comp); comp.connect(ctx.destination);
+    this.sfx = ctx.createGain(); this.sfx.connect(this.master);
+    this.music = ctx.createGain(); this.music.connect(this.master);
+    // 2 Sekunden weißes Rauschen als Rohmaterial für Klicks, Zischen, Applaus
+    const len = ctx.sampleRate * 2;
+    this.noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = this.noiseBuf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    this.applyVolumes();
+    this.startMusic();
+  },
+  applyVolumes() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const m = this.muted ? 0 : 1;
+    this.sfx.gain.setTargetAtTime(this.sfxVol * m, t, 0.05);
+    this.music.gain.setTargetAtTime(this.musicVol * 0.55 * m, t, 0.05);
+  },
+  get t() { return this.ctx.currentTime; },
+  ok() { return !!this.ctx && this.ctx.state === 'running'; },
+
+  /* ---------- Grundbausteine ---------- */
+  env(g, t, a, peak, dur) {
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(Math.max(peak, 0.0002), t + a);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  },
+  osc(type, f0, f1, dur, vol, out = this.sfx, delay = 0) {
+    const c = this.ctx, t = c.currentTime + delay;
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = type; o.frequency.setValueAtTime(f0, t);
+    if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(Math.max(f1, 20), t + dur);
+    this.env(g, t, 0.004, vol, dur);
+    o.connect(g); g.connect(out); o.start(t); o.stop(t + dur + 0.02);
+    return o;
+  },
+  noise(type, freq, q, dur, vol, out = this.sfx, delay = 0, freqEnd) {
+    const c = this.ctx, t = c.currentTime + delay;
+    const s = c.createBufferSource(); s.buffer = this.noiseBuf;
+    const f = c.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t); f.Q.value = q;
+    if (freqEnd) f.frequency.exponentialRampToValueAtTime(freqEnd, t + dur);
+    const g = c.createGain(); this.env(g, t, 0.002, vol, dur);
+    s.connect(f); f.connect(g); g.connect(out);
+    s.start(t, Math.random() * 1.5); s.stop(t + dur + 0.02);
+  },
+
+  /* ---------- Aufprall-Klänge je Material ---------- */
+  impact(mat, strength, onHead) {
+    if (!this.ok()) return;
+    // Begrenzung: max. ~22 Aufprall-Sounds pro Sekunde, sonst wird es Matsch
+    const now = performance.now();
+    if (now - this.hitBudgetT > 1000) { this.hitBudgetT = now; this.hitBudget = 0; }
+    if (++this.hitBudget > 22 && strength < 0.6) return;
+    const s = clamp(strength, 0.03, 1);
+    const v = 0.15 + s * 0.85;
+    // tiefer „Wumms“, der bei jedem Aufprall dabei ist
+    this.osc('sine', 150 + s * 40, 45, 0.12 + s * 0.12, v * 0.9);
+    switch (mat) {
+      case 'wood':
+        this.noise('bandpass', 700 + rnd(-100, 150), 1.6, 0.07, v * 0.8);
+        this.osc('triangle', 330 + rnd(-30, 30), 210, 0.06, v * 0.35);
+        break;
+      case 'marble':
+        this.noise('bandpass', 3000 + rnd(-300, 400), 4, 0.035, v * 0.7);
+        this.osc('sine', 1700 + rnd(-200, 200), 1650, 0.18, v * 0.08);
+        this.osc('triangle', 260, 180, 0.05, v * 0.3);
+        break;
+      case 'metal': {
+        const base = 380 + rnd(-60, 80);
+        [1, 2.76, 5.4, 8.9].forEach((k, i) => this.osc('sine', base * k, base * k * 0.995, 0.35 + s * 0.6 - i * 0.07, v * (0.16 - i * 0.03)));
+        this.noise('highpass', 2500, 0.7, 0.04, v * 0.4);
+        break;
+      }
+      case 'rubber':
+        this.boing(0.5 + s * 0.5);
+        break;
+      case 'sand':
+        this.noise('lowpass', 600, 0.5, 0.18, v * 0.6);
+        break;
+      case 'grass':
+        this.noise('bandpass', 400, 0.8, 0.09, v * 0.7);
+        this.osc('triangle', 220, 150, 0.06, v * 0.3);
+        break;
+      case 'ball':
+        this.osc('sine', 90, 40, 0.3, v);
+        this.noise('lowpass', 300, 0.7, 0.2, v * 0.6);
+        break;
+      case 'cardboard':
+        this.noise('bandpass', 1200, 1.2, 0.06, v * 0.7);
+        break;
+      default:
+        this.noise('bandpass', 900, 1, 0.06, v * 0.6);
+    }
+    if (onHead === 'titan') this.osc('sine', 1250, 1240, 0.5, v * 0.12); // „Ding!“ beim Titan-Schädel
+  },
+  /** cartoonhaftes Knochen-/Gelenk-Knacksen: schnelle Klickserie plus Rutschpfeife */
+  crunch(s) {
+    if (!this.ok()) return;
+    const now = performance.now();
+    if (now - this.lastCrunch < 180) return;
+    this.lastCrunch = now;
+    const n = 4 + ((s * 3) | 0);
+    for (let i = 0; i < n; i++) this.noise('bandpass', 1600 + rnd(0, 1200), 5, 0.022, 0.5, this.sfx, i * 0.028);
+    this.osc('square', 950, 420, 0.16, 0.05, this.sfx, 0.02);
+  },
+  boing(s = 1) {
+    if (!this.ok()) return;
+    const c = this.ctx, t = c.currentTime;
+    const o = c.createOscillator(), g = c.createGain(), lfo = c.createOscillator(), lg = c.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(140, t);
+    o.frequency.exponentialRampToValueAtTime(420, t + 0.08);
+    o.frequency.exponentialRampToValueAtTime(190, t + 0.45);
+    lfo.frequency.value = 22; lg.gain.value = 35;
+    lfo.connect(lg); lg.connect(o.frequency);
+    this.env(g, t, 0.005, 0.45 * s, 0.5);
+    o.connect(g); g.connect(this.sfx);
+    o.start(t); lfo.start(t); o.stop(t + 0.52); lfo.stop(t + 0.52);
+  },
+  /** Formant-Synthese für kurze Ausrufe („Oof!“, „Aua!“, „Huch!“) */
+  voice(kind) {
+    if (!this.ok()) return;
+    const now = performance.now();
+    if (now - this.lastVoice < 650) return;
+    this.lastVoice = now;
+    const c = this.ctx, t = c.currentTime;
+    // Vokal-Formanten [F1, F2]
+    const V = { a: [800, 1250], o: [500, 900], u: [340, 800], e: [450, 1900], i: [300, 2300] };
+    let seq, pitch;
+    const p0 = rnd(0.9, 1.15);
+    if (kind === 'oof') { seq = [['o', 0], ['u', 0.12]]; pitch = [[200, 0], [120, 0.28]]; }
+    else if (kind === 'aua') { seq = [['a', 0], ['u', 0.13], ['a', 0.22]]; pitch = [[250, 0], [310, 0.13], [190, 0.4]]; }
+    else { seq = [['u', 0], ['u', 0.08]]; pitch = [[180, 0], [330, 0.2]]; } // huch
+    const dur = pitch[pitch.length - 1][1] + 0.05;
+    const src = c.createOscillator(); src.type = 'sawtooth';
+    pitch.forEach(([f, dt], i) => i ? src.frequency.exponentialRampToValueAtTime(f * p0, t + dt) : src.frequency.setValueAtTime(f * p0, t));
+    const out = c.createGain(); this.env(out, t, 0.02, 0.5, dur);
+    [0, 1].forEach((fi) => {
+      const f = c.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = fi ? 9 : 6;
+      seq.forEach(([v, dt], i) => i ? f.frequency.linearRampToValueAtTime(V[v][fi], t + dt) : f.frequency.setValueAtTime(V[v][fi], t));
+      const g = c.createGain(); g.gain.value = fi ? 0.5 : 1;
+      src.connect(f); f.connect(g); g.connect(out);
+    });
+    if (kind === 'huch') this.noise('bandpass', 1500, 1, 0.08, 0.3);
+    out.connect(this.sfx); src.start(t); src.stop(t + dur + 0.05);
+  },
+  whoosh(s = 1) {
+    if (!this.ok()) return;
+    this.noise('bandpass', 300, 1.2, 0.35, 0.5 * s, this.sfx, 0, 2400);
+  },
+  tick(v) { if (this.ok()) this.osc('square', 260 + v * 900, 260 + v * 900, 0.035, 0.12); },
+  click() { if (this.ok()) this.osc('triangle', 900, 600, 0.05, 0.2); },
+  squish() { if (this.ok()) { this.noise('lowpass', 900, 3, 0.15, 0.6, this.sfx, 0, 200); this.osc('sine', 600, 1400, 0.12, 0.15); } },
+  strike() {
+    if (!this.ok()) return;
+    for (let i = 0; i < 9; i++) this.noise('bandpass', 900 + rnd(0, 1500), 3, 0.06, 0.4, this.sfx, i * 0.022);
+  },
+  achievement() {
+    if (!this.ok()) return;
+    [784, 988, 1319].forEach((f, i) => this.osc('square', f, f, 0.12, 0.09, this.sfx, i * 0.08));
+  },
+  hole() {
+    if (!this.ok()) return;
+    [523, 659, 784, 1047, 1319].forEach((f, i) => this.osc('triangle', f, f, 0.18, 0.18, this.sfx, i * 0.06));
+  },
+
+  /* ---------- Ergebnis-Jingles ---------- */
+  applause(dur = 2.6, vol = 0.5) {
+    if (!this.ok()) return;
+    const n = (dur * 55) | 0;
+    for (let i = 0; i < n; i++) {
+      const d = Math.pow(Math.random(), 0.7) * dur;
+      const fade = 1 - d / dur;
+      this.noise('bandpass', 1100 + rnd(0, 1600), 1.5, 0.03, vol * (0.3 + fade * 0.7) * rnd(0.4, 1), this.sfx, d);
+    }
+  },
+  fanfare() {
+    if (!this.ok()) return;
+    const notes = [[523, 0, 0.14], [659, 0.15, 0.14], [784, 0.3, 0.14], [1047, 0.45, 0.6]];
+    notes.forEach(([f, d, l]) => { this.osc('square', f, f, l, 0.12, this.sfx, d); this.osc('triangle', f / 2, f / 2, l, 0.15, this.sfx, d); });
+    this.osc('sawtooth', 784, 784, 0.6, 0.05, this.sfx, 0.45);
+  },
+  sadTrombone() {
+    if (!this.ok()) return;
+    const c = this.ctx;
+    [[392, 0, 0.32], [370, 0.36, 0.32], [349, 0.72, 0.32], [330, 1.08, 1.0]].forEach(([f, d, l], i) => {
+      const t = c.currentTime + d;
+      const o = c.createOscillator(), g = c.createGain(), fl = c.createBiquadFilter();
+      o.type = 'sawtooth'; o.frequency.setValueAtTime(f, t);
+      if (i === 3) { // „wah-wah-waaaah“ mit Vibrato
+        const lfo = c.createOscillator(), lg = c.createGain();
+        lfo.frequency.value = 5.5; lg.gain.value = 9; lfo.connect(lg); lg.connect(o.frequency);
+        lfo.start(t); lfo.stop(t + l);
+        o.frequency.linearRampToValueAtTime(f * 0.94, t + l);
+      }
+      fl.type = 'lowpass'; fl.frequency.setValueAtTime(500, t); fl.frequency.linearRampToValueAtTime(1500, t + 0.12); fl.frequency.linearRampToValueAtTime(600, t + l);
+      this.env(g, t, 0.03, 0.22, l);
+      o.connect(fl); fl.connect(g); g.connect(this.sfx); o.start(t); o.stop(t + l + 0.05);
+    });
+  },
+
+  /* ---------- Dauergeräusche (Ventilator, rollende Kugel) ---------- */
+  loop(name, type, freq) {
+    if (!this.ok() || this.loops[name]) return;
+    const c = this.ctx;
+    const s = c.createBufferSource(); s.buffer = this.noiseBuf; s.loop = true;
+    const f = c.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = 0.7;
+    const g = c.createGain(); g.gain.value = 0;
+    s.connect(f); f.connect(g); g.connect(this.sfx); s.start();
+    this.loops[name] = { s, g, f };
+  },
+  loopLevel(name, v) {
+    const l = this.loops[name];
+    if (l) l.g.gain.setTargetAtTime(clamp(v, 0, 1), this.ctx.currentTime, 0.08);
+  },
+  stopLoops() {
+    for (const k in this.loops) {
+      const l = this.loops[k];
+      try { l.g.gain.setTargetAtTime(0, this.ctx.currentTime, 0.05); l.s.stop(this.ctx.currentTime + 0.3); } catch (e) {}
+    }
+    this.loops = {};
+  },
+
+  /* ---------- Musik: kleiner prozeduraler Chiptune-Funk-Loop ---------- */
+  startMusic() {
+    if (this.music_) return;
+    const BPM = 108, STEP = 60 / BPM / 4; // Sechzehntel
+    // 4 Takte: Em7 – Em7 – A7 – G7/B
+    const roots = [40, 40, 45, 43];       // MIDI-Grundtöne für den Bass
+    const chordTones = [[64, 67, 71, 74], [64, 67, 71, 74], [64, 67, 69, 73], [62, 65, 67, 71]];
+    // funky Bass-Rhythmus (1 = Ton, 0 = Pause), Oktavsprünge per Muster
+    const bassHits = [1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 1, 0, 0, 1, 0];
+    const bassOct = [0, 0, 0, 12, 0, 0, 0, 0, 7, 0, 10, 12, 0, 0, 3, 0];
+    const kick = [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0];
+    const snare = [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1];
+    const stab = [0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0];
+    const rng = mulberry32(7);
+    // vorab erzeugte Lead-Melodie (16 Schritte × 4 Takte), damit der Loop wiedererkennbar ist
+    const lead = [];
+    for (let b = 0; b < 4; b++) for (let i = 0; i < 16; i++) {
+      lead.push(rng() < (i % 4 === 0 ? 0.55 : 0.22) ? chordTones[b][(rng() * 4) | 0] + 12 : 0);
+    }
+    const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
+    const st = (this.music_ = { step: 0, next: this.ctx.currentTime + 0.1 });
+    const out = this.music;
+    const play = (time, i) => {
+      const bar = ((i / 16) | 0) % 4, s = i % 16;
+      const c = this.ctx;
+      const note = (type, f, t, len, vol, slideTo) => {
+        const o = c.createOscillator(), g = c.createGain();
+        o.type = type; o.frequency.setValueAtTime(f, t);
+        if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + len);
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.005);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+        o.connect(g); g.connect(out); o.start(t); o.stop(t + len + 0.02);
+      };
+      const nz = (freq, t, len, vol, type = 'highpass') => {
+        const n = c.createBufferSource(); n.buffer = this.noiseBuf;
+        const f = c.createBiquadFilter(); f.type = type; f.frequency.value = freq;
+        const g = c.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+        n.connect(f); f.connect(g); g.connect(out); n.start(t, Math.random()); n.stop(t + len + 0.02);
+      };
+      if (bassHits[s]) note('square', mtof(roots[bar] + bassOct[s]), time, STEP * 1.6, 0.16);
+      if (bassHits[s]) note('triangle', mtof(roots[bar] + bassOct[s] - 12), time, STEP * 1.8, 0.22);
+      if (kick[s]) note('sine', 150, time, 0.16, 0.6, 40);
+      if (snare[s]) { nz(1800, time, 0.11, 0.28); note('triangle', 220, time, 0.06, 0.15, 140); }
+      nz(7000, time, s % 2 ? 0.03 : 0.06, s % 4 === 2 ? 0.1 : 0.05);
+      if (stab[s]) chordTones[bar].slice(0, 3).forEach((m) => note('square', mtof(m), time, STEP * 0.7, 0.035));
+      const ld = lead[bar * 16 + s];
+      if (ld && bar !== 1) note('triangle', mtof(ld), time, STEP * 1.5, 0.1);
+    };
+    // Lookahead-Scheduler: plant immer ~0,15 s im Voraus
+    this.musicTimer = setInterval(() => {
+      if (!this.ctx || this.ctx.state !== 'running') return;
+      const c = this.ctx;
+      if (st.next < c.currentTime - 0.2) st.next = c.currentTime + 0.05; // nach Tab-Wechsel neu einrasten
+      while (st.next < c.currentTime + 0.15) {
+        play(st.next, st.step);
+        st.next += STEP * (st.step % 2 ? 0.92 : 1.08); // leichter Swing
+        st.step = (st.step + 1) % 64;
+      }
+    }, 30);
+  },
+};
+/* =========================================================
+   SPIELDATEN: Körperzonen, Puppen, Power-Ups, Erfolge, Kommentare
+   ========================================================= */
+
+/** Die zehn wählbaren Körperstellen mit Punkte-Multiplikator. */
+const ZONES = [
+  { id: 'head', name: 'Kopf', short: 'Kopf', mult: 3.0 },
+  { id: 'neck', name: 'Hals', short: 'Hals', mult: 2.6 },
+  { id: 'chest', name: 'Brust', short: 'Brust', mult: 1.5 },
+  { id: 'belly', name: 'Bauch', short: 'Bauch', mult: 1.3 },
+  { id: 'armL', name: 'Linker Arm', short: 'li. Arm', mult: 1.0 },
+  { id: 'armR', name: 'Rechter Arm', short: 're. Arm', mult: 1.0 },
+  { id: 'legL', name: 'Linkes Bein', short: 'li. Bein', mult: 1.1 },
+  { id: 'legR', name: 'Rechtes Bein', short: 're. Bein', mult: 1.1 },
+  { id: 'footL', name: 'Linker Fuß', short: 'li. Fuß', mult: 0.8 },
+  { id: 'footR', name: 'Rechter Fuß', short: 're. Fuß', mult: 0.8 },
+];
+const ZONE = Object.fromEntries(ZONES.map((z) => [z.id, z]));
+
+/** Testpuppen mit Eigenschaften (mods = Zonen-Multiplikatoren). */
+const DUMMIES = [
+  { id: 'crash', name: 'Crash-Test-Dummy', ico: '🟡', trait: 'Kopftreffer +25 %', mods: { head: 1.25 } },
+  { id: 'office', name: 'Büro-Bernd', ico: '👔', trait: 'Bauch +40 % (Kantinenschnitzel)', mods: { belly: 1.4 } },
+  { id: 'hero', name: 'Captain Purzel', ico: '🦸', trait: 'Spandex: 65 % weniger Reibung', mods: {}, frictionMul: 0.35 },
+  { id: 'golf', name: 'Golf-Günther', ico: '🏌️', trait: 'Extra wackeliges Knie (+50 % Knie)', mods: {}, wobblyKnee: true },
+  { id: 'pizza', name: 'Pizza-Paolo', ico: '🍕', trait: 'Karton fliegt mit, Kartontreffer +60', mods: {} },
+];
+const DUMMY = Object.fromEntries(DUMMIES.map((d) => [d.id, d]));
+
+/** Power-Ups, vor dem Wurf zuschaltbar. */
+const POWERUPS = [
+  { id: 'rubber', name: '🦴 Gummiknochen', tip: 'Halber Schaden, wildere Sprünge' },
+  { id: 'titan', name: '🪖 Titan-Schädel', tip: 'Kopfpraller doppelt' },
+  { id: 'butter', name: '🧈 Butter-Socken', tip: 'Extrem rutschig' },
+  { id: 'slowmo', name: '🐌 Zeitlupe', tip: 'Erster Aufprall in 0,25×' },
+  { id: 'golfball', name: '⛳ Golfball-Modus', tip: 'Springt nach jedem Aufprall weiter' },
+];
+
+/** Erfolge (dauerhaft im localStorage). */
+const ACHIEVEMENTS = [
+  { id: 'headfirst', name: 'Kopf voran', desc: 'Der erste Aufprall ist ein Kopftreffer.' },
+  { id: 'landing', name: 'Treppen-Landung', desc: 'Auf einem Treppenabsatz liegen bleiben.' },
+  { id: 'facebrake', name: 'Vollbremsung mit dem Gesicht', desc: 'Ein brutaler Kopfaufprall mit Höchsttempo.' },
+  { id: 'allbones', name: 'Kein Knochen heil', desc: 'Alle zehn Körperstellen getroffen.' },
+  { id: 'rally', name: 'Ragdoll-Rallye', desc: 'Eine Combo von x5 oder mehr.' },
+  { id: 'bottom', name: 'Ganz unten angekommen', desc: 'Bis zur letzten Stufe gefallen.' },
+  { id: 'strike', name: 'Strike!', desc: 'Von der Bowlingkugel erwischt.' },
+  { id: 'banana', name: 'Bananenrepublik', desc: 'Auf der Bananenschale ausgerutscht.' },
+  { id: 'holeinone', name: 'Hole-in-One', desc: 'Auf dem Golfplatz eingelocht.' },
+  { id: 'gentle', name: 'Wie auf Wolken', desc: 'Weniger als 100 Punkte. Respekt?' },
+  { id: 'fivedigit', name: 'Fünfstellig', desc: '10.000 Punkte in einem Sturz.' },
+  { id: 'bigone', name: 'Krankenkassen-Albtraum', desc: '30.000 Punkte in einem Sturz.' },
+  { id: 'trampoline', name: 'Trampolin-Profi', desc: 'Dreimal im selben Sturz aufs Trampolin.' },
+  { id: 'pizza', name: 'Lieferung zugestellt', desc: 'Pizza-Paolo verliert den Karton.' },
+];
+const ACH = Object.fromEntries(ACHIEVEMENTS.map((a) => [a.id, a]));
+
+/** Lustige medizinische Kommentare je Zone, sortiert nach Schwere (leicht → schwer). */
+const COMMENTS = {
+  head: [
+    'Leichte Beule. Der Kopf sieht jetzt aus wie ein Pfirsich mit Ambitionen.',
+    'Der Schädel meldet: „Software-Update erforderlich“.',
+    'Gehirnerschütterung? Eher Gehirn-Milchshake. Mit Streuseln.',
+    'Der Kopf hat jetzt eine eigene Postleitzahl.',
+  ],
+  neck: [
+    'Der Hals knackt beim Nicken wie ein altes Parkett.',
+    'Der Hals dreht sich jetzt auch ohne Grund nach links.',
+    'Das Genick hat Kündigung eingereicht – fristlos.',
+  ],
+  chest: [
+    'Ein blauer Fleck in Form eines Treppengeländers.',
+    'Die Rippen spielen jetzt Xylophon – leider in Moll.',
+    'Brustkorb ist offiziell als Akkordeon zugelassen.',
+  ],
+  belly: [
+    'Der Bauch grummelt beleidigt.',
+    'Das Frühstück wurde neu sortiert. Alphabetisch.',
+    'Der Bauchnabel sucht noch nach seinem alten Platz.',
+  ],
+  armL: [
+    'Der linke Arm winkt jetzt von selbst.',
+    'Der linke Arm hat beschlossen, ab sofort Rechtshänder zu sein.',
+    'Der linke Ellbogen biegt jetzt in beide Richtungen ab. Praktisch!',
+  ],
+  armR: [
+    'Der rechte Arm ist leicht verstimmt.',
+    'Der rechte Arm hat das Handtuch geworfen. Und dann den Rest.',
+    'Der rechte Arm ist jetzt etwa 3 cm länger. Und hat einen Knoten.',
+  ],
+  legL: [
+    'Das linke Bein humpelt aus Solidarität.',
+    'Das linke Knie macht beim Gehen Kastagnetten-Geräusche.',
+    'Die linke Kniescheibe hat eine Karriere als Eishockeypuck begonnen.',
+  ],
+  legR: [
+    'Das rechte Bein ist eingeschlafen. Für immer, sagt es.',
+    'Das rechte Schienbein klingt beim Antippen wie ein Gong.',
+    'Die rechte Kniescheibe hat eine Karriere als Eishockeypuck begonnen.',
+  ],
+  footL: [
+    'Der linke Fuß fühlt sich leicht verknickt.',
+    'Der linke Fuß zeigt jetzt dauerhaft nach Norden.',
+    'Der linke Fuß hat gekündigt und arbeitet jetzt als Türstopper.',
+  ],
+  footR: [
+    'Der rechte große Zeh ist beleidigt.',
+    'Der rechte Fuß hat sein Gewölbe verloren. Fundbüro informiert.',
+    'Der rechte Fuß wurde zum Flossenfuß umgebaut.',
+  ],
+};
+const COMMENT_NONE = [
+  'Keine Verletzungen festgestellt. Die Versicherung ist enttäuscht.',
+  'Patient wirkt gelangweilt. Empfehlung: mehr Schwung.',
+];
+const COMMENT_EXTRA = [
+  'Patient fragt, ob er nächste Woche den Aufzug nehmen darf.',
+  'Gips wurde in Großpackung bestellt.',
+  'Die Treppe hat sich formell beim Patienten entschuldigt.',
+  'Empfohlene Therapie: drei Wochen Hängematte, ebenerdig.',
+  'Die Röntgenaufnahme sieht aus wie modernes Kunsthandwerk.',
+  'Physiotherapeut hat beim Anblick spontan Urlaub eingereicht.',
+];
+
+/** Comic-Schriftzüge für besonders harte Treffer. */
+const COMIC = ['BONK!', 'POW!', 'KLONK!', 'ZACK!', 'WUMMS!', 'AUTSCH!', 'KRACH!', 'PENG!'];
+/* =========================================================
+   3D-WELT: Level-Aufbau, Ragdoll, Requisiten und Zufallsereignisse (cannon-es)
+   Einheiten: Meter, Sekunden. x = treppab, y = oben, z = quer.
+   ========================================================= */
+const STEP = 1 / 180;          // feste Physik-Schrittweite
+const STAIR_W = 2.4;           // Treppenbreite (z) – seit 1.2.0 breiter (vorher 1,6 m)
+const DUMMY_X = -0.32;         // Standposition auf der Startplattform
+
+// Kollisionsgruppen: Treppe/Statik, Puppe, Bowlingkugel, Requisiten
+const GRP = { STATIC: 1, PART: 2, BALL: 4, PROP: 8 };
+
+/* ---------- Materialien ---------- */
+const MATS = {
+  //            Reibung  Abprall  Klang
+  wood:   { friction: 0.5, rest: 0.22, sound: 'wood' },
+  marble: { friction: 0.03, rest: 0.25, sound: 'marble' },
+  metal:  { friction: 0.4, rest: 0.2, sound: 'metal' },
+  grass:  { friction: 0.6, rest: 0.2, sound: 'grass' },
+  sand:   { friction: 1.2, rest: 0.0, sound: 'sand' },
+  rubber: { friction: 0.9, rest: 0.6, sound: 'rubber' },
+  wall:   { friction: 0.3, rest: 0.1, sound: 'wood' },
+};
+
+/* ---------- Level-Baukasten ---------- */
+class LevelBuilder {
+  constructor(mat) { this.mat = mat; this.x = 0; this.y = 0; this.blocks = []; this.extras = []; this.n = 0; this.flagNo = 0; }
+  block(x0, x1, top, type, mat = this.mat, extra = {}) { const b = { x0, x1, top, type, mat, ...extra }; this.blocks.push(b); return b; }
+  start(len) { this.block(-len, 0, 0, 'start', this.mat, { index: 0 }); this.x0 = -len; return this; }
+  steps(n, run, rise, opts = {}) {
+    for (let i = 0; i < n; i++) {
+      this.y -= rise; this.n++;
+      const tramp = opts.trampAt === i + 1;
+      this.block(this.x, this.x + run, this.y, tramp ? 'tramp' : 'step', tramp ? 'rubber' : this.mat, { index: this.n });
+      this.x += run;
+    }
+    return this;
+  }
+  landing(len, opts = {}) {
+    const x0 = this.x;
+    this.block(x0, x0 + len, this.y, 'landing', opts.mat || this.mat, { index: this.n });
+    this.x += len;
+    if (opts.ramp) this.extras.push({ kind: 'ramp', x0: this.x - opts.ramp.len, x1: this.x, y: this.y, h: opts.ramp.h });
+    if (opts.windmill) this.extras.push({ kind: 'windmill', x: x0 + len / 2, y: this.y });
+    if (opts.obstacle) this.extras.push({ kind: 'log', x: x0 + len * 0.55, y: this.y, r: opts.obstacle / 2 });
+    if (opts.flag) this.extras.push({ kind: 'flag', x: x0 + len * opts.flag, y: this.y, n: ++this.flagNo });
+    return this;
+  }
+  /** Golfloch: Grube mit „Becher“ am Grund */
+  hole(w, depth) {
+    this.block(this.x, this.x + w, this.y - depth, 'pit', this.mat, { index: this.n });
+    this.extras.push({ kind: 'cup', x0: this.x, x1: this.x + w, y: this.y - depth, top: this.y });
+    this.x += w;
+    return this;
+  }
+  /** Querrohr über der Treppe (Metall-Level); Höhe wird später aus der Oberfläche berechnet */
+  pipe(dx, above, r) { this.extras.push({ kind: 'pipe', x: this.x + dx, above, r }); return this; }
+  finish(len, opts = {}) { this.block(this.x, this.x + len, this.y, 'floor', opts.mat || this.mat, { index: this.n }); this.x += len; this.x1 = this.x; return this; }
+}
+
+/* ---------- Die vier Level ---------- */
+const LEVELS = [
+  {
+    id: 'wood', name: 'Omas Holztreppe', ico: '🪵', mat: 'wood', desc: 'Klassisch, knarzig, gnadenlos.',
+    // seit 1.3.0 rund dreimal so lang: 6 Läufe à 10 Stufen
+    build: (B) => { B.start(1.8); for (let i = 0; i < 6; i++) { B.steps(10, 0.27, 0.19); if (i < 5) B.landing(1.0); } B.finish(3.2); },
+  },
+  {
+    id: 'marble', name: 'Palast aus Marmor', ico: '🏛️', mat: 'marble', desc: 'Frisch poliert. Spiegelglatt.',
+    // 4 Läufe à 15 Stufen
+    build: (B) => { B.start(1.8); for (let i = 0; i < 4; i++) { B.steps(15, 0.3, 0.17); if (i < 3) B.landing(1.2); } B.finish(3.6); },
+  },
+  {
+    id: 'metal', name: 'Fabrik-Treppe', ico: '⚙️', mat: 'metal', desc: 'Steil, kantig, mit Rohren im Weg.',
+    // 7 Läufe à 9 Stufen, über jedem Lauf und Absatz hängen Rohre
+    build: (B) => {
+      const rng = mulberry32(42);
+      B.start(1.6).pipe(0.75, 0.78, 0.07);
+      for (let i = 0; i < 7; i++) {
+        B.steps(9, 0.22, 0.23).pipe(-0.5 - rng() * 0.6, 0.6 + rng() * 0.1, 0.07 + rng() * 0.02);
+        if (i < 6) B.landing(0.9).pipe(0.3 + rng() * 0.3, 0.64 + rng() * 0.1, 0.07);
+      }
+      B.finish(3.0);
+    },
+  },
+  {
+    id: 'golf', name: 'Endlosgolf-Treppe', ico: '⛳', mat: 'grass', desc: 'Löcher, Rampen, Trampoline, Windmühle. Fore!',
+    // der Parcours wird dreimal hintereinander gebaut (Bahn 1–18)
+    build: (B) => {
+      B.start(1.6);
+      for (let r = 0; r < 3; r++) {
+        B.steps(5, 0.3, 0.19)
+          .landing(0.8, { flag: 0.25 })
+          .steps(5, 0.3, 0.2, { trampAt: 3 })
+          .hole(0.55, 0.45).landing(0.8, { flag: 0.5 })
+          .steps(5, 0.29, 0.2)
+          .landing(1.5, { windmill: r !== 1 })
+          .steps(6, 0.3, 0.2, { trampAt: 5 })
+          .landing(1.0, { mat: 'sand' })
+          .steps(5, 0.3, 0.2)
+          .landing(1.1, { obstacle: 0.26, flag: 0.2 })
+          .steps(4, 0.3, 0.21)
+          .hole(0.55, 0.45).landing(0.8)
+          .steps(6, 0.29, 0.2, { trampAt: 2 })
+          .landing(1.0, { ramp: { len: 0.45, h: 0.13 } });
+      }
+      B.steps(5, 0.3, 0.2).hole(0.6, 0.45).finish(3.4, { mat: 'grass' });
+      B.extras.push({ kind: 'flag', x: B.x1 - 1.0, y: B.y, n: 18 });
+    },
+  },
+];
+const LEVEL = Object.fromEntries(LEVELS.map((l) => [l.id, l]));
+
+/* ---------- Ragdoll-Bauplan (stehend, Blick nach +x; links = −z) ---------- */
+// he = halbe Kantenlängen, p = Mittelpunkt relativ zum Bodenpunkt, m = Masse in kg
+const PARTS3 = [
+  { id: 'head', zone: 'head', r: 0.12, p: [0.02, 1.73, 0], m: 5 },
+  { id: 'neck', zone: 'neck', he: [0.05, 0.05, 0.05], p: [0, 1.565, 0], m: 1.2 },
+  { id: 'chest', zone: 'chest', he: [0.11, 0.19, 0.18], p: [0, 1.33, 0], m: 22 },
+  { id: 'belly', zone: 'belly', he: [0.1, 0.13, 0.15], p: [0, 1.01, 0], m: 12 },
+  { id: 'upperArmL', zone: 'armL', side: 'L', he: [0.045, 0.15, 0.045], p: [0, 1.35, -0.235], m: 2.5 },
+  { id: 'forearmL', zone: 'armL', side: 'L', he: [0.04, 0.15, 0.04], p: [0, 1.04, -0.235], m: 1.8 },
+  { id: 'upperArmR', zone: 'armR', side: 'R', he: [0.045, 0.15, 0.045], p: [0, 1.35, 0.235], m: 2.5 },
+  { id: 'forearmR', zone: 'armR', side: 'R', he: [0.04, 0.15, 0.04], p: [0, 1.04, 0.235], m: 1.8 },
+  { id: 'thighL', zone: 'legL', side: 'L', he: [0.065, 0.22, 0.065], p: [0, 0.72, -0.09], m: 8 },
+  { id: 'shinL', zone: 'legL', side: 'L', he: [0.05, 0.21, 0.05], p: [0, 0.29, -0.09], m: 4 },
+  { id: 'footL', zone: 'footL', side: 'L', he: [0.12, 0.04, 0.05], p: [0.05, 0.04, -0.09], m: 1.2 },
+  { id: 'thighR', zone: 'legR', side: 'R', he: [0.065, 0.22, 0.065], p: [0, 0.72, 0.09], m: 8 },
+  { id: 'shinR', zone: 'legR', side: 'R', he: [0.05, 0.21, 0.05], p: [0, 0.29, 0.09], m: 4 },
+  { id: 'footR', zone: 'footR', side: 'R', he: [0.12, 0.04, 0.05], p: [0.05, 0.04, 0.09], m: 1.2 },
+];
+/**
+ * Gelenke: [Name, Eltern, Kind, Drehpunkt, Art, Grenzen]
+ * cone  = Kugelgelenk mit Kegelwinkel und Verdrehwinkel
+ * hinge = Scharnier um die z-Achse mit [min, max] (Ellbogen, Knie)
+ */
+const JOINTS3 = [
+  ['Genick', 'chest', 'neck', [0, 1.52, 0], 'cone', [0.45, 0.35]],
+  ['Nacken', 'neck', 'head', [0, 1.61, 0], 'cone', [0.55, 0.6]],
+  ['Wirbelsäule', 'belly', 'chest', [0, 1.14, 0], 'cone', [0.45, 0.3]],
+  ['li. Schulter', 'chest', 'upperArmL', [0, 1.49, -0.235], 'cone', [1.5, 0.5]],
+  ['re. Schulter', 'chest', 'upperArmR', [0, 1.49, 0.235], 'cone', [1.5, 0.5]],
+  ['li. Ellbogen', 'upperArmL', 'forearmL', [0, 1.195, -0.235], 'hinge', [-0.05, 2.4]],
+  ['re. Ellbogen', 'upperArmR', 'forearmR', [0, 1.195, 0.235], 'hinge', [-0.05, 2.4]],
+  ['li. Hüfte', 'belly', 'thighL', [0, 0.93, -0.09], 'cone', [1.1, 0.3]],
+  ['re. Hüfte', 'belly', 'thighR', [0, 0.93, 0.09], 'cone', [1.1, 0.3]],
+  ['li. Knie', 'thighL', 'shinL', [0, 0.505, -0.09], 'hinge', [-2.4, 0.05]],
+  ['re. Knie', 'thighR', 'shinR', [0, 0.505, 0.09], 'hinge', [-2.4, 0.05]],
+  ['li. Knöchel', 'shinL', 'footL', [0, 0.08, -0.09], 'cone', [0.5, 0.3]],
+  ['re. Knöchel', 'shinR', 'footR', [0, 0.08, 0.09], 'cone', [0.5, 0.3]],
+];
+
+const _zAxisQ = new CANNON.Quaternion().setFromEuler(Math.PI / 2, 0, 0); // Zylinder: y-Achse → z-Achse
+
+/* ---------- Welt aufbauen ---------- */
+function buildWorld(levelDef, dummy, powers, opts) {
+  const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -9.82, 0) });
+  world.broadphase = new CANNON.SAPBroadphase(world);
+  world.solver.iterations = 24;
+  world.allowSleep = false;
+  world.defaultContactMaterial.friction = 0.3;
+  world.defaultContactMaterial.restitution = 0.2;
+
+  const B = new LevelBuilder(levelDef.mat);
+  levelDef.build(B);
+  const W = {
+    world, level: levelDef, dummy, powers, blocks: B.blocks, extras: B.extras, stepTotal: B.n,
+    x0: B.x0, x1: B.x1, bottom: B.y, parts: {}, partList: [], joints: [], props: [], welds: [],
+    time: 0, flags: {}, dizzyUntil: 0, events: [], banana: null, fan: null, ball: null, slice: null, windmills: [], cups: [],
+    contactMats: [], pendingBoosts: [],
+  };
+  for (const e of W.extras) if (e.kind === 'pipe') e.y = surfaceAt(W, e.x) + e.above;
+
+  /* ----- Zufallsereignisse wählen (vor dem Bau: das Trampolin ersetzt eine Stufe) ----- */
+  if (opts.events) {
+    const pool = ['ball', 'banana', 'fan', 'tramp'];
+    const n = Math.random() < 0.45 ? 2 : 1;
+    for (let i = 0; i < n; i++) W.events.push(pool.splice((Math.random() * pool.length) | 0, 1)[0]);
+  }
+  const steps = W.blocks.filter((b) => b.type === 'step');
+  if (W.events.includes('tramp')) {
+    const s = steps[2 + ((Math.random() * Math.min(8, steps.length - 4)) | 0)];
+    s.mat = 'rubber'; s.type = 'tramp'; s.event = true;
+  }
+
+  /* ----- Materialien: Puppe gegen jede Oberfläche (Reibung je nach Puppe und Power-Ups) ----- */
+  const fricMul = (dummy.frictionMul || 1) * (powers.has('butter') ? 0.015 : 1);
+  const partMat = new CANNON.Material('part');
+  const mats = {};
+  for (const k in MATS) {
+    mats[k] = new CANNON.Material(k);
+    const cm = new CANNON.ContactMaterial(mats[k], partMat, {
+      friction: MATS[k].friction * fricMul, restitution: powers.has('rubber') ? Math.max(MATS[k].rest, 0.75) : MATS[k].rest,
+    });
+    cm.baseFriction = cm.friction;
+    world.addContactMaterial(cm);
+    W.contactMats.push(cm);
+  }
+  W.partMat = partMat;
+
+  /* ----- statische Blöcke; gleich hohe Nachbarn mit gleichem Material werden verschmolzen ----- */
+  const runs = [];
+  for (const b of W.blocks) {
+    const r = runs[runs.length - 1];
+    if (r && r.top === b.top && r.mat === b.mat && Math.abs(r.x1 - b.x0) < 1e-6) r.x1 = b.x1; else runs.push({ ...b });
+  }
+  const DEPTH = 1.6;
+  const addStatic = (shape, x, y, z, mat, meta, q) => {
+    const body = new CANNON.Body({ mass: 0, material: mats[mat], collisionFilterGroup: GRP.STATIC, collisionFilterMask: -1 });
+    body.addShape(shape, undefined, q);
+    body.position.set(x, y, z);
+    body.meta = { mat, ...meta };
+    world.addBody(body);
+    return body;
+  };
+  const box = (hx, hy, hz) => new CANNON.Box(new CANNON.Vec3(hx, hy, hz));
+  for (const r of runs) addStatic(box((r.x1 - r.x0) / 2, DEPTH / 2, STAIR_W / 2 + 0.3), (r.x0 + r.x1) / 2, r.top - DEPTH / 2, 0, r.mat, { type: 'stair' });
+  // unsichtbare Seitenwände, damit niemand seitlich oder hinten herausfällt
+  const len = W.x1 - W.x0, cx = (W.x0 + W.x1) / 2, cy = (W.bottom + 3) / 2, hy = (3 - W.bottom) / 2 + 1;
+  addStatic(box(len / 2 + 0.3, hy, 0.15), cx, cy, -STAIR_W / 2 - 0.15, 'wall', { type: 'wall' });
+  addStatic(box(len / 2 + 0.3, hy, 0.15), cx, cy, STAIR_W / 2 + 0.15, 'wall', { type: 'wall' });
+  addStatic(box(0.15, hy, STAIR_W / 2 + 0.3), W.x0 - 0.15, cy, 0, 'wall', { type: 'wall' });
+  addStatic(box(0.15, hy, STAIR_W / 2 + 0.3), W.x1 + 0.15, cy, 0, 'wall', { type: 'wall' });
+
+  /* ----- Extras ----- */
+  for (const e of W.extras) {
+    if (e.kind === 'pipe') {
+      addStatic(new CANNON.Cylinder(e.r, e.r, STAIR_W + 0.3, 8), e.x, e.y, 0, 'metal', { type: 'pipe' }, _zAxisQ);
+    } else if (e.kind === 'log') {
+      addStatic(new CANNON.Cylinder(e.r, e.r, STAIR_W - 0.1, 8), e.x, e.y + e.r, 0, 'wood', { type: 'obstacle' }, _zAxisQ);
+    } else if (e.kind === 'ramp') {
+      // schräge Platte; die Oberseite läuft von (x0, y) bis (x1, y + h)
+      const L = Math.hypot(e.x1 - e.x0, e.h), a = Math.atan2(e.h, e.x1 - e.x0), th = 0.15;
+      const q = new CANNON.Quaternion().setFromEuler(0, 0, a);
+      const mx = (e.x0 + e.x1) / 2 + Math.sin(a) * th, my = e.y + e.h / 2 - Math.cos(a) * th;
+      const b = addStatic(box(L / 2, th, STAIR_W / 2), mx, my, 0, 'wood', { type: 'ramp' });
+      b.quaternion.copy(q);
+    } else if (e.kind === 'windmill') {
+      // Windmühlen-Flügel über die ganze Treppenbreite, dreht sich (kinematisch)
+      const hub = { x: e.x, y: e.y + 1.2 };
+      const blade = new CANNON.Body({ mass: 0, type: CANNON.Body.KINEMATIC, material: mats.wood, collisionFilterGroup: GRP.STATIC, collisionFilterMask: -1 });
+      blade.addShape(box(0.95, 0.05, STAIR_W / 2 - 0.15));
+      blade.position.set(hub.x, hub.y, 0);
+      blade.angularVelocity.set(0, 0, -1.6);
+      blade.meta = { mat: 'wood', type: 'windmill' };
+      world.addBody(blade);
+      W.windmills.push({ blade, hub, x: e.x, y: e.y });
+    } else if (e.kind === 'cup') {
+      W.cups.push({ ...e, done: false });
+    }
+  }
+
+  /* ----- Zufallsereignis: Bananenschale ----- */
+  if (W.events.includes('banana')) {
+    const cand = W.blocks.filter((b) => b.type === 'step' && b.index >= 3 && b.index <= W.stepTotal - 3);
+    const s = pick(cand);
+    W.banana = { x: (s.x0 + s.x1) / 2, y: s.top, z: rnd(-0.35, 0.35) };
+  }
+  /* ----- Zufallsereignis: Ventilator am Rand eines Absatzes, bläst quer über die Treppe ----- */
+  if (W.events.includes('fan')) {
+    const lands = W.blocks.filter((b) => b.type === 'landing');
+    const b = lands.length ? pick(lands) : pick(steps.slice(3));
+    const fx = (b.x0 + b.x1) / 2, side = Math.random() < 0.5 ? -1 : 1;
+    W.fan = { x: fx, y: b.top, z: -side * (STAIR_W / 2 - 0.3), dir: side, sx: rnd(-0.35, 0.35), x0: fx - 1.4, x1: fx + 1.4, y0: b.top - 0.4, y1: b.top + 2.2, rot: 0 };
+  }
+
+  createRagdoll(W, partMat, dummy, DUMMY_X, 0);
+
+  /* ----- Bowlingkugel (wird erst nach dem Wurf in die Welt gesetzt) ----- */
+  if (W.events.includes('ball')) {
+    const ball = new CANNON.Body({ mass: 7, material: mats.wood, collisionFilterGroup: GRP.BALL, collisionFilterMask: GRP.STATIC | GRP.PART, linearDamping: 0.01, angularDamping: 0.01 });
+    ball.addShape(new CANNON.Sphere(0.11));
+    ball.position.set(W.x0 + 0.3, 0.115, rnd(-0.15, 0.15));
+    ball.prop = 'ball'; ball.meta = { mat: 'ball', type: 'ball' };
+    W.ball = ball;
+  }
+  return W;
+}
+
+/** Baut die Puppe aus Körperteilen, Gelenken und Requisiten. */
+function createRagdoll(W, partMat, dummy, ox, oy) {
+  for (const p of PARTS3) {
+    const body = new CANNON.Body({
+      mass: p.m, material: partMat, collisionFilterGroup: GRP.PART, collisionFilterMask: GRP.STATIC | GRP.BALL,
+      linearDamping: 0.02, angularDamping: 0.12,
+    });
+    body.addShape(p.r ? new CANNON.Sphere(p.r) : new CANNON.Box(new CANNON.Vec3(...p.he)));
+    body.position.set(ox + p.p[0], oy + p.p[1], p.p[2]);
+    body.part = p; body.zone = p.zone;
+    W.parts[p.id] = body; W.partList.push(body);
+    W.world.addBody(body);
+  }
+  for (const [name, pa, pc, piv, kind, lim0] of JOINTS3) {
+    const a = W.parts[pa], b = W.parts[pc];
+    const knee = name.includes('Knie');
+    const lim = knee && dummy.wobblyKnee ? [-2.9, 0.45] : lim0;   // Golf-Günthers Wackelknie
+    const pw = new CANNON.Vec3(ox + piv[0], oy + piv[1], piv[2]);
+    const pivotA = pw.vsub(a.position), pivotB = pw.vsub(b.position);
+    let c;
+    if (kind === 'cone') {
+      const down = /Schulter|Hüfte|Knöchel/.test(name);
+      const ax = new CANNON.Vec3(0, down ? -1 : 1, 0);
+      c = new CANNON.ConeTwistConstraint(a, b, { pivotA, pivotB, axisA: ax, axisB: ax, angle: lim[0], twistAngle: lim[1], collideConnected: false });
+    } else {
+      const ax = new CANNON.Vec3(0, 0, 1);
+      c = new CANNON.HingeConstraint(a, b, { pivotA, pivotB, axisA: ax, axisB: ax, collideConnected: false });
+    }
+    W.world.addConstraint(c);
+    W.joints.push({ name, a, b, c, kind, min: lim[0], max: lim[1], pivotA, knee });
+  }
+
+  const propBody = (mass, shape, x, y, z, prop, mat) => {
+    const b = new CANNON.Body({ mass, collisionFilterGroup: GRP.PROP, collisionFilterMask: GRP.STATIC, linearDamping: 0.02, angularDamping: 0.1 });
+    b.addShape(shape);
+    b.position.set(ox + x, oy + y, z);
+    b.prop = prop; b.meta = { mat, type: 'prop' };
+    return b;
+  };
+  /* Pizza-Paolo trägt einen Karton; die Pizza liegt schon bereit und fliegt beim Loslösen heraus */
+  if (dummy.id === 'pizza') {
+    const box = propBody(0.6, new CANNON.Box(new CANNON.Vec3(0.2, 0.03, 0.2)), 0.16, 0.86, 0.3, 'pizzabox', 'cardboard');
+    weld(W, W.parts.forearmR, box);
+    W.pizzaBox = box;
+    const slice = propBody(0.25, new CANNON.Cylinder(0.14, 0.14, 0.025, 8), 0.16, 0.92, 0.3, 'slice', 'cardboard');
+    W.slice = slice;                     // wird erst beim Loslösen in die Welt gesetzt
+  }
+  /* Golf-Günther hält einen Schläger */
+  if (dummy.id === 'golf') {
+    const club = propBody(0.5, new CANNON.Box(new CANNON.Vec3(0.015, 0.38, 0.015)), 0.04, 0.5, 0.26, 'club', 'metal');
+    club.addShape(new CANNON.Box(new CANNON.Vec3(0.06, 0.025, 0.02)), new CANNON.Vec3(0.045, -0.38, 0));
+    weld(W, W.parts.forearmR, club);
+    W.club = club;
+  }
+}
+
+/** Starre Verbindung (Requisit in der Hand), lösbar */
+function weld(W, a, b) {
+  W.world.addBody(b);
+  const c = new CANNON.LockConstraint(a, b, { maxForce: 1e4 });
+  W.world.addConstraint(c);
+  W.welds.push({ a, b, c, broken: false });
+  W.props.push(b);
+}
+function breakWeld(W, body) {
+  const w = W.welds.find((x) => x.b === body && !x.broken);
+  if (!w) return false;
+  w.broken = true;
+  W.world.removeConstraint(w.c);
+  return true;
+}
+
+/* ---------- Scharnier-Grenzen (cannon-es-Scharniere haben keine eingebauten Grenzen) ---------- */
+const _q = new CANNON.Quaternion(), _ax = new CANNON.Vec3();
+function enforceHingeLimits(W) {
+  for (const j of W.joints) {
+    if (j.kind !== 'hinge') continue;
+    const a = j.a, b = j.b;
+    a.quaternion.conjugate(_q);
+    const rel = _q.mult(b.quaternion);
+    let ang = 2 * Math.atan2(rel.z, rel.w);
+    ang = Math.atan2(Math.sin(ang), Math.cos(ang));
+    const err = ang < j.min ? j.min - ang : ang > j.max ? j.max - ang : 0;
+    if (!err) continue;
+    a.quaternion.vmult(new CANNON.Vec3(0, 0, 1), _ax);
+    const relV = b.angularVelocity.dot(_ax) - a.angularVelocity.dot(_ax);
+    let dv = 0;
+    if ((err > 0 && relV < 0) || (err < 0 && relV > 0)) dv = -relV;
+    dv += err * 12;
+    const wa = b.mass / (a.mass + b.mass), wb = a.mass / (a.mass + b.mass);
+    b.angularVelocity.vadd(_ax.scale(dv * wb), b.angularVelocity);
+    a.angularVelocity.vsub(_ax.scale(dv * wa), a.angularVelocity);
+  }
+}
+
+/** Oberkante der Treppe an Position x */
+function surfaceAt(W, x) {
+  let t = -Infinity;
+  for (const b of W.blocks) if (x >= b.x0 && x <= b.x1) t = Math.max(t, b.top);
+  return isFinite(t) ? t : W.bottom;
+}
+/** Block, auf den ein Kontaktpunkt fällt */
+function blockAt(W, x, y) {
+  let best = null, bd = 0.25;
+  for (const b of W.blocks) {
+    if (x < b.x0 - 0.02 || x > b.x1 + 0.02) continue;
+    const d = Math.abs(y - b.top);
+    if (d < bd) { bd = d; best = b; }
+  }
+  return best;
+}
+
+/** Sicherheitsnetz gegen Durchtunneln + Tempolimit (Puppe, Kugel, Requisiten) */
+function antiTunnel(W, list) {
+  const lim = STAIR_W / 2 - 0.03;
+  for (const b of list) {
+    if (b.type !== CANNON.Body.DYNAMIC || !b.world) continue;
+    const p = b.position, v = b.velocity;
+    if (!isFinite(p.x) || !isFinite(p.y) || !isFinite(p.z)) { p.set(W.parts.chest.position.x || 0, 1, 0); v.set(0, 0, 0); continue; }
+    const top = surfaceAt(W, p.x);
+    if (p.y < top - 0.02 && p.y > top - 1.5) { p.y = top + 0.06; if (v.y < 0) v.y = 0; }
+    if (p.z > lim) { p.z = lim; if (v.z > 0) v.z = 0; } else if (p.z < -lim) { p.z = -lim; if (v.z < 0) v.z = 0; }
+    if (p.x < W.x0 + 0.03) { p.x = W.x0 + 0.03; if (v.x < 0) v.x = 0; } else if (p.x > W.x1 - 0.03) { p.x = W.x1 - 0.03; if (v.x > 0) v.x = 0; }
+    const sp = v.length();
+    if (sp > 22) v.scale(22 / sp, v);
+    const w = b.angularVelocity.length();
+    if (w > 35) b.angularVelocity.scale(35 / w, b.angularVelocity);
+  }
+}
+/* =========================================================
+   SPIELLOGIK 3D: Zustände, Wurf, Physikschritt, Schaden & Punkte,
+   Power-Ups, Zufallsereignisse, Replay, Auswertung
+   ========================================================= */
+const G = {
+  state: 'menu',          // menu | aim | fall | twitch | result | replay
+  levelId: 'wood', dummyChoice: 'crash', dummyId: 'crash',
+  powers: new Set(),
+  settings: { slowmo: true, events: true },
+  zone: 'chest', angle: 12, power: 0, charging: false, chargePhase: 0, chargeTick: 0,
+  W: null, run: null, score: 0, scoring: false,
+  timeScale: 1, slowUntil: 0, slowScale: 1, acc: 0, settleT: 0, twitchT: 0, nextTwitch: 0,
+  camMode: 'follow', rec: null, recording: false, replayIdx: 0, replayEv: 0,
+  lastBoost: -9, lastTramp: -9,
+};
+
+/* ---------- Effekte (werden fürs Replay mitgeschrieben) ---------- */
+const FX = { particles: [], popups: [], comics: [], shake: 0, punch: 0 };
+const BURST_COL = {
+  wood: ['#c98b4f', '#8a5528', '#e8c79c'], marble: ['#ffffff', '#d9d4ea'], metal: ['#ffe066', '#ffffff'],
+  grass: ['#5cd65c', '#2f9e44', '#8a5a33'], sand: ['#e8cf8a', '#cfae62'], rubber: ['#3fd0ff', '#ffffff'],
+};
+const FX_FN = {
+  burst(x, y, z, mat, s) {
+    const n = Math.min(22, 3 + ((s * 16) | 0)), col = BURST_COL[mat] || BURST_COL.wood;
+    for (let i = 0; i < n; i++) {
+      const a = rnd(0, Math.PI * 2), sp = rnd(0.5, 1.5 + s * 3);
+      FX.particles.push({ x, y, z, vx: Math.cos(a) * sp, vy: rnd(1, 2.5 + s * 3), vz: Math.sin(a) * sp, life: rnd(0.35, 0.8), max: 0.8, size: mat === 'metal' ? rnd(0.008, 0.015) : rnd(0.015, 0.035), col: pick(col), kind: Math.random() < 0.4 ? 'chip' : 'dust' });
+    }
+  },
+  stars(x, y, z, n) {
+    for (let i = 0; i < n; i++) {
+      const a = rnd(0, Math.PI * 2), sp = rnd(1, 3);
+      FX.particles.push({ x, y, z, vx: Math.cos(a) * sp, vy: rnd(1.5, 4), vz: Math.sin(a) * sp, life: rnd(0.5, 0.9), max: 0.9, size: 0.05, col: pick(['#ffd23f', '#ff4f8b', '#3fd0ff', '#ffffff']), kind: 'star' });
+    }
+  },
+  popup(x, y, z, text, col, big) {
+    let k = 0;
+    for (const p of FX.popups) if (p.life > 0.9 && Math.hypot(p.x - x, p.y0 - y) < 0.5) k++;
+    FX.popups.push({ x, y, z, y0: y, lift: k * 22, text, col, big, life: 1.3 });
+  },
+  comic(x, y, z, text, rot) { FX.comics.push({ x, y, z, text, life: 0.9, rot }); },
+  sound(name, ...a) { if (Sound[name]) Sound[name](...a); },
+  shake(a) { FX.shake = Math.max(FX.shake, a); },
+  punch(a) { FX.punch = Math.max(FX.punch, a); },
+  combo(m) { UI.combo(m); },
+  flag(name, v) { G.W.flags[name] = v; },
+  dizzy(t) { G.W.dizzyUntil = t; },
+};
+function fx(type, ...args) {
+  if (G.recording && G.rec) G.rec.ev.push([G.rec.frames.length, type, args]);
+  FX_FN[type](...args);
+}
+
+/* ---------- Neuen Durchgang aufbauen ---------- */
+function newRun(forMenu = false) {
+  Sound.stopLoops();
+  G.dummyId = G.dummyChoice === 'random' ? pick(DUMMIES).id : G.dummyChoice;
+  G.W = buildWorld(LEVEL[G.levelId], DUMMY[G.dummyId], G.powers, G.settings);
+  for (const b of G.W.partList) b.addEventListener('collide', onCollide);
+  for (const b of G.W.props.concat(G.W.ball ? [G.W.ball] : [], G.W.slice ? [G.W.slice] : [])) b.addEventListener('collide', onPropCollide);
+  G.run = {
+    zones: Object.fromEntries(ZONES.map((z) => [z.id, { pts: 0, hits: 0, max: 0 }])),
+    best: { pts: 0, label: '–' }, impacts: 0, firstZone: null, maxStep: 0,
+    combo: { count: 0, last: -1e9, mult: 1, max: 1 }, flags: {}, bonus: 0, jointHits: {}, tramp: 0,
+  };
+  G.score = 0; G.scoring = false; G.timeScale = 1; G.slowUntil = 0; G.acc = 0; G.settleT = 0;
+  G.power = 0; G.charging = false; G.lastBoost = -9; G.lastTramp = -9; G.slowT = 0;
+  G.rec = null; G.recording = false;
+  FX.particles.length = 0; FX.popups.length = 0; FX.comics.length = 0;
+  Scene3.build(G.W);
+  G.state = forMenu ? 'menu' : 'aim';
+  Cam.reset(); Cam.snap();
+  if (!forMenu) UI.enterAim();
+}
+
+/* ---------- Kraftleiste ---------- */
+function startCharge() {
+  if (G.state !== 'aim' || G.charging) return;
+  G.charging = true; G.chargeStart = performance.now(); G.chargeTick = 0;
+  UI.charging(true);
+}
+function updateCharge(dt) {
+  if (!G.charging) return;
+  // echte Uhrzeit statt Bildzeit: die Leiste pulsiert auch bei ruckelnder Grafik gleichmäßig
+  G.chargePhase = ((performance.now() - G.chargeStart) / 1000) * 0.95 * Math.PI * 2;
+  G.power = (1 - Math.cos(G.chargePhase)) / 2;
+  G.chargeTick -= dt;
+  if (G.chargeTick <= 0) { Sound.tick(G.power); G.chargeTick = lerp(0.2, 0.045, G.power); }
+}
+function releaseCharge() {
+  if (!G.charging) return;
+  G.charging = false;
+  UI.charging(false);
+  launch(G.power);
+}
+
+/* ---------- Wurf ---------- */
+function launch(power) {
+  const W = G.W;
+  const a = (G.angle * Math.PI) / 180;
+  const v = 10.5 * (0.06 + 0.94 * power) * rnd(0.98, 1.02);
+  const dir = new CANNON.Vec3(Math.cos(a), Math.sin(a), rnd(-0.07, 0.07));
+  // Abstand im Gelenk-Graphen: gewählte Stelle bekommt den vollen Schubs, Nachbarn weniger
+  const dist = new Map(), queue = [];
+  for (const b of W.partList) if (b.zone === G.zone) { dist.set(b, 0); queue.push(b); }
+  while (queue.length) {
+    const b = queue.shift();
+    for (const j of W.joints) {
+      const o = j.a === b ? j.b : j.b === b ? j.a : null;
+      if (o && !dist.has(o)) { dist.set(o, dist.get(b) + 1); queue.push(o); }
+    }
+  }
+  for (const b of W.partList) {
+    const f = Math.pow(0.72, dist.get(b) ?? 4);
+    b.velocity.set(dir.x * v * f, dir.y * v * f, dir.z * v * f);
+  }
+  for (const p of W.props) p.velocity.copy(W.parts.forearmR.velocity);
+  Sound.whoosh(0.4 + power * 0.8);
+  if (power > 0.85) Sound.voice('huch');
+  G.state = 'fall'; G.scoring = true; W.time = 0; G.settleT = 0;
+  // Replay-Aufzeichnung: alle beweglichen Körper (auch noch nicht eingesetzte)
+  G.rec = { frames: [], ev: [], hud: [], bodies: recBodies(W), flags0: { ...W.flags } };
+  G.recording = true;
+  UI.enterFall();
+}
+function recBodies(W) {
+  return W.partList.concat(W.props, W.ball ? [W.ball] : [], W.slice ? [W.slice] : [], W.windmills.map((m) => m.blade));
+}
+
+/* ---------- Physikschritt ---------- */
+const _f = new CANNON.Vec3();
+function physStep() {
+  const W = G.W;
+  W.time += STEP;
+  // Bowlingkugel rollt kurz nach dem Wurf los
+  if (W.ball && !W.flags.ball && W.time > 0.8 && G.state === 'fall') {
+    W.world.addBody(W.ball);
+    W.ball.velocity.set(4.5, 0, 0);
+    fx('flag', 'ball', true);
+    fx('popup', W.ball.position.x, W.ball.position.y + 0.4, W.ball.position.z, '🎳 Bowlingkugel!', '#ff4f8b', true);
+  }
+  if (W.flags.ball && W.time < 10 && W.ball.velocity.length() < 1.2) W.ball.applyForce(new CANNON.Vec3(W.ball.mass * 3, 0, 0));
+  // Ventilator bläst quer über die Treppe
+  if (W.fan && W.time < 10 && G.state === 'fall') {   // der Ventilator läuft nach 10 s aus
+    const f = W.fan;
+    for (const b of W.partList) {
+      const p = b.position;
+      if (p.x > f.x0 && p.x < f.x1 && p.y > f.y0 && p.y < f.y1) {
+        const near = 1 - Math.min(1, Math.abs(p.x - f.x) / 1.4);
+        _f.set(f.sx * 0.5, 0.15, f.dir).scale(b.mass * 9 * (0.45 + near), _f);
+        b.applyForce(_f);
+      }
+    }
+  }
+  // Bananenschale: Berührung prüfen
+  if (W.banana && !W.flags.bananaGone && G.state === 'fall') {
+    const bn = W.banana;
+    for (const b of W.partList) {
+      const p = b.position;
+      if (Math.abs(p.x - bn.x) < 0.22 && Math.abs(p.z - bn.z) < 0.6 && p.y - bn.y < 0.22) { slipOnBanana(b); break; }
+    }
+  }
+  // Golflöcher: eingelocht?
+  for (const c of W.cups) {
+    if (c.done || !G.scoring) continue;
+    const hit = W.partList.find((b) => b.position.x > c.x0 && b.position.x < c.x1 && b.position.y < c.top - 0.15);
+    if (hit) holeIn(c, hit);
+  }
+  // Bananen-Rutschphase vorbei: Reibung zurück
+  if (W.slipUntil && W.time > W.slipUntil) { W.slipUntil = 0; for (const cm of W.contactMats) cm.friction = cm.baseFriction; }
+  // Nachzucken
+  if (G.state === 'twitch') {
+    G.twitchT += STEP;
+    if (G.twitchT > G.nextTwitch) {
+      G.nextTwitch = G.twitchT + rnd(0.14, 0.33);
+      const b = W.parts[pick(['forearmL', 'forearmR', 'shinL', 'shinR', 'footL', 'footR', 'head'])];
+      const k = Math.max(0, 1 - G.twitchT / 2.8);
+      b.angularVelocity.set(rnd(-6, 6) * k, rnd(-6, 6) * k, rnd(-6, 6) * k);
+      b.velocity.y += rnd(0.3, 1.2) * k;
+    }
+  }
+  W.world.step(STEP);
+  enforceHingeLimits(W);
+  antiTunnel(W, G.rec ? G.rec.bodies : W.partList);
+  // aufgestaute Sprünge (Trampolin, Golfball-Modus, Banane) erst nach dem Lösen anwenden
+  for (const fn of W.pendingBoosts) fn();
+  W.pendingBoosts.length = 0;
+}
+
+function slipOnBanana(part) {
+  const W = G.W, run = G.run;
+  fx('flag', 'bananaGone', true);
+  for (const cm of W.contactMats) cm.friction = 0.002;
+  W.slipUntil = W.time + 1.3;
+  W.pendingBoosts.push(() => { part.velocity.x += 3.5; part.velocity.y += 2.5; part.angularVelocity.z -= 8; });
+  fx('sound', 'squish'); fx('sound', 'voice', 'huch');
+  fx('popup', W.banana.x, W.banana.y + 0.5, W.banana.z, '🍌 Bananenschale! +150', '#ffd23f', true);
+  if (G.scoring) { G.score += 150; run.bonus += 150; }
+  unlock('banana');
+}
+function holeIn(c, part) {
+  const run = G.run;
+  c.done = true;
+  const head = part.zone === 'head', bonus = head ? 1500 : 500;
+  G.score += bonus; run.bonus += bonus;
+  const x = (c.x0 + c.x1) / 2;
+  fx('sound', 'hole');
+  fx('popup', x, c.top + 0.6, part.position.z, head ? '⛳ HOLE-IN-ONE! +1.500' : '⛳ Eingelocht! +500', '#4fdc7a', true);
+  fx('stars', x, c.top, part.position.z, 12);
+  unlock('holeinone');
+}
+
+/* ---------- Kollision Puppe ↔ Welt → Schaden ---------- */
+const _pt = new CANNON.Vec3();
+function onCollide(e) {
+  const W = G.W, run = G.run;
+  if (G.state !== 'fall' && G.state !== 'twitch') return;
+  const part = e.target, other = e.body, c = e.contact;
+  if (other.zone) return;
+  const vn = Math.abs(c.getImpactVelocityAlongNormal());
+  if (vn < 0.8) return;
+  c.bi.position.vadd(c.ri, _pt);
+  const pt = { x: _pt.x, y: _pt.y, z: _pt.z };
+  // Normale von der Oberfläche weg zur Puppe
+  const sgn = c.bi === part ? -1 : 1;
+  const out = { x: c.ni.x * sgn, y: c.ni.y * sgn, z: c.ni.z * sgn };
+  const speed = Math.max(vn, part.velocity.length());
+  const strength = clamp((vn - 0.7) / 7, 0, 1);
+  const meta = other.meta || {};
+  const blk = meta.type === 'stair' ? blockAt(W, pt.x, pt.y) : null;
+  const mat = blk ? blk.mat : meta.type === 'wall' ? W.level.mat : meta.mat;
+  const titan = part.zone === 'head' && G.powers.has('titan') ? 'titan' : null;
+  fx('sound', 'impact', MATS[mat] ? MATS[mat].sound : mat, strength, titan);
+  if (vn > 1.4) fx('burst', pt.x, pt.y, pt.z, mat === 'ball' ? 'rubber' : mat, strength);
+
+  // Trampolin: Boing!
+  if (mat === 'rubber' && vn > 2.5 && W.time - G.lastTramp > 0.28 && G.state === 'fall') {
+    G.lastTramp = W.time;
+    run.tramp++;
+    const up = rnd(5.5, 7);
+    W.pendingBoosts.push(() => { for (const b of W.partList) { b.velocity.x = b.velocity.x * 0.9 + 0.8; b.velocity.y = Math.max(b.velocity.y, 0) + up; } });
+    fx('sound', 'voice', 'huch');
+    fx('popup', pt.x, pt.y + 0.3, pt.z, 'BOING!', '#3fd0ff', true);
+    if (run.tramp >= 3) unlock('trampoline');
+  }
+  if (!G.scoring) return;
+  if (W.time - (part._lastHit || -1) < 0.05) return;     // Mindestabstand zwischen Treffern desselben Teils
+  part._lastHit = W.time;
+
+  // ---- Punkte (gleiche Skala wie in der 2D-Version) ----
+  const vs = vn * 1.9;
+  let pts = Math.pow(Math.max(0, vs - 1.8), 1.55) * 4.2;
+  pts *= 0.6 + 0.4 * Math.min(1, vn / speed);
+  pts *= ZONE[part.zone].mult;
+  pts *= W.dummy.mods[part.zone] || 1;
+  if (titan) pts *= 2;
+  if (G.powers.has('rubber')) pts *= 0.5;
+  let label = ZONE[part.zone].short, jointHit = null;
+  for (const j of W.joints) {
+    if (j.a !== part && j.b !== part) continue;
+    const jp = j.a.pointToWorldFrame(j.pivotA);
+    if (jp.distanceTo(_pt) < 0.08 && !/Genick|Nacken|Wirbel/.test(j.name)) { jointHit = j; break; }
+  }
+  if (jointHit) {
+    pts *= 1.4;
+    if (jointHit.knee && W.dummy.wobblyKnee) pts *= 1.5;
+    label = jointHit.name; run.jointHits[jointHit.name] = (run.jointHits[jointHit.name] || 0) + 1;
+  }
+  let surfLabel = '';
+  if (meta.type === 'wall') pts *= 0.7;
+  else if (meta.type === 'pipe') { pts *= 1.3; surfLabel = 'Rohr'; }
+  else if (meta.type === 'windmill') { pts *= 1.6; surfLabel = 'Windmühle'; }
+  else if (meta.type === 'obstacle' || meta.type === 'ramp') pts *= 1.2;
+  else if (meta.type === 'ball') { pts *= 1.6; surfLabel = 'Strike'; }
+  else if (blk && (blk.type === 'landing' || blk.type === 'pit')) { pts *= 1.8; surfLabel = 'Absatz'; }
+  else if (blk && blk.type === 'floor') pts *= 1.25;
+  if (blk && (blk.type === 'step' || blk.type === 'start') && Math.abs(pt.x - blk.x1) < 0.06 && Math.abs(pt.y - blk.top) < 0.06) {
+    pts *= W.level.mat === 'metal' ? 1.6 : 1.3; surfLabel = 'Kante';
+  }
+  if (mat === 'rubber') pts *= 0.3;
+  if (mat === 'sand') pts *= 0.6;
+  if (meta.type === 'ball') { unlock('strike'); fx('sound', 'strike'); }
+  pts = Math.round(pts);
+  if (pts < 5) return;
+
+  // ---- Combo ----
+  const cb = run.combo;
+  if (pts >= 180) {
+    // gleichzeitige Treffer (ein Aufprall, mehrere Körperteile) steigern die Combo nicht
+    if (W.time - cb.last >= 0.12) { if (W.time - cb.last < 0.6) cb.count++; else cb.count = 1; cb.last = W.time; }
+    const m = cb.count >= 2 ? Math.min(cb.count, 6) : 1;
+    if (m > cb.mult) fx('combo', m);
+    cb.mult = m; cb.max = Math.max(cb.max, m);
+    pts *= m;
+  }
+  const z = run.zones[part.zone];
+  z.pts += pts; z.hits++; z.max = Math.max(z.max, pts);
+  run.impacts++;
+  G.score += pts;
+  if (!run.firstZone) { run.firstZone = part.zone; if (part.zone === 'head') unlock('headfirst'); }
+  if (pts > run.best.pts) run.best = { pts, label: label + (surfLabel ? ' · ' + surfLabel : '') };
+  if (part.zone === 'head' && vn > 7) unlock('facebrake');
+
+  // ---- Rückmeldung ----
+  const big = pts >= 400;
+  if (pts >= 15) fx('popup', pt.x, pt.y + 0.1, pt.z, `${label} +${fmt(pts)}`, part.zone === 'head' || part.zone === 'neck' ? '#ff4f8b' : jointHit ? '#ff8a3d' : '#ffd23f', big);
+  if (pts >= 150) fx('stars', pt.x, pt.y, pt.z, big ? 9 : 4);
+  if (pts >= 550 && W.time - (W.lastComic || -9) > 0.6) { W.lastComic = W.time; fx('comic', pt.x, pt.y, pt.z, pick(COMIC), rnd(-0.3, 0.3)); }
+  if (pts >= 380 || (jointHit && pts >= 220)) fx('sound', 'crunch', strength);
+  if (part.zone === 'head' && pts >= 180) { fx('sound', 'voice', 'aua'); fx('dizzy', W.time + 2.6); }
+  else if ((part.zone === 'chest' || part.zone === 'belly') && pts >= 160) fx('sound', 'voice', 'oof');
+  fx('shake', clamp(pts / 900, 0, 1) * 10);
+  fx('punch', clamp(pts / 700, 0.15, 1));
+
+  // ---- Zeitlupe beim ersten großen Aufprall ----
+  if (!run.flags.slowmo) {
+    if (G.powers.has('slowmo') && pts >= 10) { run.flags.slowmo = true; G.slowScale = 0.25; G.slowUntil = performance.now() + 1500; }
+    else if (G.settings.slowmo && vn > 4.5) { run.flags.slowmo = true; G.slowScale = 0.35; G.slowUntil = performance.now() + 900; }
+  }
+  // ---- Golfball-Modus: nach jedem Aufprall weiterhüpfen ----
+  if (G.powers.has('golfball') && vn > 2.2 && W.time - G.lastBoost > 0.18) {
+    G.lastBoost = W.time;
+    const k = Math.min(vn * 0.5, 4.5);
+    W.pendingBoosts.push(() => { for (const b of W.partList) { b.velocity.x += out.x * k * 0.6 + 0.6; b.velocity.y += Math.max(0, out.y) * k * 0.6 + k * 0.45; b.velocity.z += out.z * k * 0.4; } });
+    fx('sound', 'boing', 0.5);
+  }
+  // ---- Requisiten lösen sich bei harten Treffern ----
+  if (part.zone === 'armR' && vn > 3.5) { detachPizza(); if (W.club && breakWeld(W, W.club)) fx('popup', pt.x, pt.y + 0.3, pt.z, 'Schläger weg! ⛳', '#ffffff'); }
+}
+
+/** Requisiten (Kugel, Karton, Schläger, Pizza) treffen auf die Welt */
+function onPropCollide(e) {
+  const W = G.W, prop = e.target, other = e.body;
+  if (G.state !== 'fall' && G.state !== 'twitch') return;
+  if (other.zone && prop.prop !== 'ball') return;
+  const vn = Math.abs(e.contact.getImpactVelocityAlongNormal());
+  if (vn < 1) return;
+  fx('sound', 'impact', prop.prop === 'ball' ? 'ball' : prop.meta.mat, clamp((vn - 0.8) / 6, 0, 1) * 0.7);
+  if (prop.prop === 'pizzabox') {
+    if (vn > 3) detachPizza();
+    if (G.scoring && W.flags.pizzaFree && vn > 2 && W.time - (W.lastBox || -9) > 0.3) {
+      W.lastBox = W.time;
+      G.score += 60; G.run.bonus += 60;
+      fx('popup', prop.position.x, prop.position.y + 0.2, prop.position.z, 'Karton +60', '#ffffff');
+    }
+  }
+  if (prop.prop === 'club' && vn > 4 && breakWeld(W, prop)) fx('popup', prop.position.x, prop.position.y + 0.3, prop.position.z, 'Schläger weg! ⛳', '#ffffff');
+}
+function detachPizza() {
+  const W = G.W;
+  if (!W.pizzaBox || W.flags.pizzaFree || !breakWeld(W, W.pizzaBox)) return;
+  fx('flag', 'pizzaFree', true);
+  const p = W.pizzaBox.position;
+  W.pendingBoosts.push(() => {
+    W.slice.position.set(p.x, p.y + 0.08, p.z);
+    W.slice.velocity.set(rnd(-0.5, 1.5), 3.5, rnd(-0.5, 0.5));
+    W.slice.angularVelocity.set(rnd(-4, 4), rnd(-4, 4), rnd(-4, 4));
+    W.world.addBody(W.slice);
+  });
+  fx('flag', 'slice', true);
+  fx('popup', p.x, p.y + 0.4, p.z, 'Pizza ist unterwegs! 🍕', '#ff8a3d', true);
+  unlock('pizza');
+}
+
+function unlock(id) {
+  if (!G.run) return;
+  G.run.flags['ach_' + id] = true;
+  if (Store.data.achievements[id]) return;
+  Store.data.achievements[id] = Date.now();
+  Store.save();
+  UI.toast('🏅 ' + ACH[id].name);
+  Sound.achievement();
+}
+
+/* ---------- pro Bild ---------- */
+function updateSim(dt) {
+  const W = G.W;
+  const target = performance.now() < G.slowUntil ? G.slowScale : 1;
+  G.timeScale = lerp(G.timeScale, target, target < G.timeScale ? 0.35 : 0.06);
+  G.acc += dt * G.timeScale;
+  let n = 0;
+  while (G.acc >= STEP && n < 8) { physStep(); G.acc -= STEP; n++; }
+  if (n >= 8) G.acc = 0;
+  const cx = W.parts.chest.position.x;
+  for (const b of W.blocks) if ((b.type === 'step' || b.type === 'tramp') && (b.x0 + b.x1) / 2 < cx) G.run.maxStep = Math.max(G.run.maxStep, b.index);
+  if (G.state === 'fall') {
+    let maxV = 0, maxW = 0;
+    for (const b of W.partList) { maxV = Math.max(maxV, b.velocity.length()); maxW = Math.max(maxW, b.angularVelocity.length()); }
+    if (maxV < 0.18 && maxW < 1.3) G.settleT += dt * G.timeScale; else G.settleT = 0;
+    // langsames Nachrutschen/Schaukeln (z. B. Butter-Socken) zählt nach 6 s ebenfalls als Ruhe
+    if (W.time > 6 && maxV < 0.6) G.slowT = (G.slowT || 0) + dt * G.timeScale; else G.slowT = 0;
+    if (G.slowT > 1.5) G.settleT = 1;
+    const limit = W.level.id === 'golf' ? 60 : 40;   // längere Treppen → mehr Zeit
+    if (G.settleT > 0.8 || W.time > limit) { G.state = 'twitch'; G.scoring = false; G.twitchT = 0; G.nextTwitch = 0.2; }
+  } else if (G.state === 'twitch' && G.twitchT > 2.8) finishRun();
+  recordFrame();
+}
+
+/* ---------- Replay ---------- */
+function recordFrame() {
+  if (!G.recording) return;
+  const bs = G.rec.bodies, f = new Float32Array(bs.length * 7);
+  for (let i = 0; i < bs.length; i++) {
+    const p = bs[i].position, q = bs[i].quaternion, o = i * 7;
+    f[o] = p.x; f[o + 1] = p.y; f[o + 2] = p.z; f[o + 3] = q.x; f[o + 4] = q.y; f[o + 5] = q.z; f[o + 6] = q.w;
+  }
+  G.rec.frames.push(f);
+  G.rec.hud.push([G.score, G.W.time, G.timeScale]);
+}
+function applyFrame(i) {
+  const f = G.rec.frames[i], bs = G.rec.bodies;
+  for (let k = 0; k < bs.length; k++) {
+    const o = k * 7;
+    bs[k].position.set(f[o], f[o + 1], f[o + 2]);
+    bs[k].quaternion.set(f[o + 3], f[o + 4], f[o + 5], f[o + 6]);
+  }
+}
+function startReplay() {
+  if (!G.rec || !G.rec.frames.length) return;
+  Sound.stopLoops();
+  G.state = 'replay'; G.replayIdx = 0; G.replayEv = 0;
+  G.W.flags = { ...G.rec.flags0 }; G.W.dizzyUntil = 0;
+  FX.particles.length = 0; FX.popups.length = 0; FX.comics.length = 0;
+  applyFrame(0);
+  Cosmetics.reset(G.W);
+  Cam.reset(); Cam.snap();
+  UI.enterReplay();
+}
+function updateReplay() {
+  const r = G.rec;
+  if (G.replayIdx >= r.frames.length) { endReplay(); return; }
+  applyFrame(G.replayIdx);
+  while (G.replayEv < r.ev.length && r.ev[G.replayEv][0] <= G.replayIdx) {
+    const [, type, args] = r.ev[G.replayEv++];
+    FX_FN[type](...args);
+  }
+  const h = r.hud[G.replayIdx];
+  G.W.time = h[1]; G.timeScale = h[2];
+  UI.setScore(h[0]);
+  G.replayIdx++;
+}
+function endReplay() {
+  Sound.stopLoops();
+  G.state = 'result'; G.timeScale = 1;
+  UI.showResult(G.lastResult, true);
+}
+
+/* ---------- Auswertung ---------- */
+function finishRun() {
+  const W = G.W, run = G.run;
+  G.recording = false;
+  Sound.stopLoops();
+  G.state = 'result';
+  const total = Math.round(G.score);
+  if (ZONES.every((z) => run.zones[z.id].hits > 0)) unlock('allbones');
+  if (run.combo.max >= 5) unlock('rally');
+  if (run.maxStep >= W.stepTotal) unlock('bottom');
+  if (total < 100) unlock('gentle');
+  if (total >= 10000) unlock('fivedigit');
+  if (total >= 30000) unlock('bigone');
+  const ch = W.parts.chest.position, under = blockAt(W, ch.x, ch.y - 0.15);
+  if (under && under.type === 'landing') unlock('landing');
+  const rank = Store.addScore(G.levelId, G.dummyId, { score: total, steps: run.maxStep, date: new Date().toLocaleDateString('de-AT') });
+  const res = {
+    total, rank, steps: run.maxStep, stepTotal: W.stepTotal, level: W.level, dummy: W.dummy,
+    comments: medicalComments(run, total),
+    achievements: Object.keys(run.flags).filter((k) => k.startsWith('ach_')).map((k) => k.slice(4)),
+  };
+  G.lastResult = res;
+  if (rank === 1 && total > 0) { Sound.fanfare(); setTimeout(() => Sound.applause(3, 0.5), 500); }
+  else if (total >= 3000) Sound.applause(2.4, 0.45);
+  else Sound.sadTrombone();
+  UI.showResult(res, false);
+}
+function medicalComments(run, total) {
+  if (total < 100) return [pick(COMMENT_NONE)];
+  const zs = ZONES.map((z) => ({ id: z.id, ...run.zones[z.id] })).filter((z) => z.pts > 0).sort((a, b) => b.pts - a.pts);
+  const out = [];
+  for (const z of zs.slice(0, 2)) {
+    const list = COMMENTS[z.id];
+    const sev = z.pts < 300 ? 0 : z.pts < 1500 ? 1 : z.pts < 4000 ? 2 : 3;
+    out.push(list[Math.min(sev, list.length - 1)]);
+  }
+  const knees = (run.jointHits['li. Knie'] || 0) + (run.jointHits['re. Knie'] || 0);
+  if (knees >= 2 && !out.some((c) => c.includes('Knie'))) out.push(knees > 3 ? COMMENTS.legR[2] : COMMENTS.legL[1]);
+  if (total > 2500) out.push(pick(COMMENT_EXTRA));
+  return out.slice(0, 3);
+}
+/* =========================================================
+   RENDERING 3D (three.js, Low-Poly) + Overlay für Popups
+   ========================================================= */
+const R = { W: 800, H: 600, dpr: 1, time: 0 };
+const INK = '#1b1030';
+const lam = (color, extra = {}) => new THREE.MeshLambertMaterial({ color, flatShading: true, ...extra });
+const _Y = new THREE.Vector3(0, 1, 0);
+
+/* ---------- Farben je Level ---------- */
+const PAL = {
+  wood:   { bg: 0x3b2617, body: [0x8a5228, 0x93592c, 0x7f4b24], tread: [0xc8833f], nose: 0x6e3f1f, wall: 0xf3d39c, end: 0x6e3f1f, floor: 0x5a3a22, steel: 0x9aa3b5, rail: 0x7b4321 },
+  marble: { bg: 0xcfc0bb, body: [0xf2eee8, 0xe9e3da, 0xf7f3ee], tread: [0xffffff], nose: 0xc9b9a8, wall: 0xf4ddd5, end: 0xe6d8cc, floor: 0xd9cfc4, steel: 0xd4a72c, rail: 0xd4a72c },
+  metal:  { bg: 0x1e2433, body: [0x4a5263, 0x515a6c, 0x464e5e], tread: [0x8c96a8], nose: 0xffd23f, wall: 0x3d4a63, end: 0x2c364b, floor: 0x232a3a, steel: 0xffd23f, rail: 0x6b7a99 },
+  golf:   { bg: 0x8fd3ff, body: [0x8a5a33, 0x93613a, 0x815430], tread: [0x56c95a, 0x4cbb50], nose: 0x3e9e42, wall: null, end: 0x5cb85c, floor: 0x6cc06c, steel: 0xffffff, rail: 0xffffff },
+};
+/* ---------- Farben je Puppe ---------- */
+const STYLES3 = {
+  crash:  { body: 0xffcd2e, legs: 0xffcd2e, feet: 0x2b2b38, hands: 0xffcd2e, skin: 0xffcd2e, forearm: 0xffcd2e, belt: 0x2b2b38 },
+  office: { body: 0xffffff, legs: 0x3d4252, feet: 0x1d1d1d, hands: 0xf5c9a5, skin: 0xf5c9a5, forearm: 0xf5c9a5, belt: 0x1d1d1d },
+  hero:   { body: 0x2f6bff, legs: 0x2f6bff, feet: 0xe63946, hands: 0xe63946, skin: 0xf5c9a5, forearm: 0x2f6bff, belt: 0xffd23f },
+  golf:   { body: 0xff7eb6, legs: 0xf1ead7, feet: 0xffffff, hands: 0xffffff, skin: 0xf2c08f, forearm: 0xf2c08f, belt: 0xffffff },
+  pizza:  { body: 0xe8343b, legs: 0x3c5fa8, feet: 0xffffff, hands: 0xe9b48a, skin: 0xe9b48a, forearm: 0xe9b48a, belt: 0x2b2b38 },
+};
+function partColor(st, id) {
+  if (id === 'head') return st.skin;
+  if (id === 'neck') return st.skin;
+  if (id.startsWith('foot')) return st.feet;
+  if (id.startsWith('shin') || id.startsWith('thigh')) return st.legs;
+  if (id.startsWith('forearm')) return st.forearm;
+  return st.body;
+}
+const shadeHex = (hex, k) => new THREE.Color(hex).multiplyScalar(k);
+
+/* ---------- Szene ---------- */
+const Scene3 = {
+  renderer: null, scene: null, camera: null, sun: null, root: null, meshes: {}, arrow: null, eyes: null, dyn: [], anim: [],
+  init(canvas) {
+    const r = (this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true }));
+    r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFShadowMap;
+    this.scene = new THREE.Scene();
+    this.camera = new THREE.PerspectiveCamera(50, 1, 0.05, 200);
+    this.hemi = new THREE.HemisphereLight(0xfff4e0, 0x6b4a3a, 1.15);
+    this.scene.add(this.hemi);
+    const sun = (this.sun = new THREE.DirectionalLight(0xffffff, 1.6));
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(1024, 1024);
+    const sc = sun.shadow.camera; sc.left = -4; sc.right = 4; sc.top = 4; sc.bottom = -4; sc.near = 0.5; sc.far = 30;
+    sun.shadow.bias = -0.0008;
+    this.scene.add(sun, sun.target);
+  },
+
+  /** Baut Level-Geometrie, Requisiten und Puppe für eine neue Welt */
+  build(W) {
+    if (this.root) { this.scene.remove(this.root); disposeTree(this.root); }
+    const root = (this.root = new THREE.Group());
+    this.scene.add(root);
+    this.dyn = []; this.anim = [];
+    const id = W.level.id, P = PAL[id], rng = mulberry32(id.length * 31 + 7);
+    const rpick = (a) => a[(rng() * a.length) | 0];
+    this.scene.background = new THREE.Color(P.bg);
+    this.scene.fog = id === 'golf' ? new THREE.Fog(0xbfe6ff, 18, 60) : new THREE.Fog(P.bg, 12, 40);
+    this.hemi.color.set(id === 'golf' ? 0xffffff : id === 'metal' ? 0xd8e2ff : 0xfff4e0);
+    this.hemi.groundColor.set(id === 'golf' ? 0x5c8a4a : id === 'metal' ? 0x2a2f3c : 0x6b4a3a);
+    const box = (w, h, d, mat, x, y, z) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+      m.position.set(x, y, z); m.receiveShadow = true; m.castShadow = false;
+      root.add(m); return m;
+    };
+    const tube = (a, b, r, mat, seg = 8) => {      // Zylinder zwischen zwei Punkten
+      const d = new THREE.Vector3().subVectors(b, a), len = d.length();
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, seg), mat);
+      m.position.copy(a).addScaledVector(d, 0.5);
+      m.quaternion.setFromUnitVectors(_Y, d.normalize());
+      m.receiveShadow = true; root.add(m); return m;
+    };
+    const V = (x, y, z) => new THREE.Vector3(x, y, z);
+    const len = W.x1 - W.x0, cx = (W.x0 + W.x1) / 2;
+    const zBack = -STAIR_W / 2 - 0.05, zFront = STAIR_W / 2 - 0.02;
+    const smooth = (x) => { let s = 0, n = 0; for (let k = -0.3; k <= 0.3; k += 0.05) { s += surfaceAt(W, clamp(x + k, W.x0, W.x1)); n++; } return s / n; };
+    const railPts = [];
+    for (let x = W.x0 + 0.05; x <= W.x1 - 0.05; x += 0.2) railPts.push([x, smooth(x)]);
+
+    /* --- Treppe: Stufenkörper, Trittfläche, Kante --- */
+    for (const b of W.blocks) {
+      const w = b.x1 - b.x0, depth = 1.6, mx = (b.x0 + b.x1) / 2;
+      box(w, depth, STAIR_W, lam(rpick(P.body)), mx, b.top - depth / 2 - 0.035, 0);
+      if (b.mat === 'rubber') { trampoline3(root, b, box); continue; }
+      let tread = P.tread[(b.index || 0) % P.tread.length];
+      if (b.mat === 'sand') tread = 0xecd9a0;
+      if (b.type === 'pit') tread = 0x2a2a2a;
+      box(w + 0.03, 0.035, STAIR_W + 0.02, lam(tread), mx + 0.015, b.top - 0.0175, 0);
+      if (b.type === 'step' || b.type === 'start') box(0.04, 0.045, STAIR_W + 0.03, lam(P.nose), b.x1, b.top - 0.022, 0);
+      if (id === 'wood' && b.type !== 'step') box(w - 0.3, 0.012, STAIR_W * 0.6, lam(0xb5303a), mx, b.top + 0.006, 0);
+      if (id === 'metal' && b.type === 'step') for (let z = -STAIR_W / 2 + 0.2; z < STAIR_W / 2; z += 0.4) box(0.05, 0.004, 0.18, lam(0xb9c2d1), mx, b.top + 0.002, z);
+      if (b.mat === 'sand') for (let i = 0; i < 14; i++) box(0.03, 0.01, 0.03, lam(0xcfae62), b.x0 + rng() * w, b.top + 0.003, (rng() - 0.5) * STAIR_W);
+    }
+
+    /* --- Kulisse je Level --- */
+    const wallTop = 4.5, wallBot = W.bottom - 2;
+    if (id !== 'golf') {
+      box(len + 0.6, wallTop - wallBot, 0.1, lam(P.wall), cx, (wallTop + wallBot) / 2, zBack - 0.06);
+      box(0.3, wallTop - wallBot, STAIR_W + 1, lam(P.end), W.x0 - 0.15, (wallTop + wallBot) / 2, 0);
+      box(0.3, wallTop - wallBot, STAIR_W + 1, lam(P.end), W.x1 + 0.15, (wallTop + wallBot) / 2, 0);
+    }
+    if (id === 'wood') {
+      for (let i = 0; i < railPts.length - 1; i++) {
+        const [x0, y0] = railPts[i], [x1, y1] = railPts[i + 1];
+        const top = (y0 + y1) / 2 + 0.95, bot = Math.min(surfaceAt(W, x0), surfaceAt(W, x1)) - 0.05;
+        box(x1 - x0 + 0.005, top - bot, 0.03, lam(i % 4 === 0 ? 0x9a5f33 : 0xa86b3c), (x0 + x1) / 2, (top + bot) / 2, zBack + 0.01);
+      }
+      for (let x = 0.4; x < W.x1 - 0.5; x += 1.9) frame3(root, x, smooth(x) + 1.85 + rng() * 0.3, zBack + 0.03, 0.55 + rng() * 0.2, 0.7, 0xc99a2e, rpick([0x7ec8e3, 0xf4a261, 0x90be6d]));
+      frame3(root, W.x0 + 0.8, 2.6, zBack + 0.03, 0.9, 1.1, 0xf2e8d5, 0x9fd8ff);
+    } else if (id === 'marble') {
+      for (let x = W.x0 + 0.6; x < W.x1; x += 2.6) {
+        const base = surfaceAt(W, x);
+        const col = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.19, 5, 8), lam(0xfbf8f2));
+        col.position.set(x, base + 2.5, zBack - 0.02); col.castShadow = true; col.receiveShadow = true; root.add(col);
+        box(0.5, 0.18, 0.3, lam(0xd4a72c), x, base + 0.09, zBack - 0.02);
+        box(0.5, 0.18, 0.3, lam(0xd4a72c), x, base + 4.9, zBack - 0.02);
+      }
+      for (let x = 1.4; x < W.x1 - 1; x += 3.4) frame3(root, x, smooth(x) + 2.0, zBack + 0.03, 0.7, 0.9, 0xd4a72c, 0xb5838d);
+      const ch = new THREE.Group(); ch.position.set(-0.4, 3.3, 0);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.05, 4, 8), lam(0xd4a72c)); ring.rotation.x = Math.PI / 2; ch.add(ring);
+      for (let i = 0; i < 8; i++) { const c = new THREE.Mesh(new THREE.OctahedronGeometry(0.07), lam(0xe8f8ff, { emissive: 0x334455 })); const a = (i / 8) * Math.PI * 2; c.position.set(Math.cos(a) * 0.45, -0.15, Math.sin(a) * 0.45); ch.add(c); }
+      root.add(ch);
+    } else if (id === 'metal') {
+      // Wandplatten-Fugen
+      for (let x = W.x0; x < W.x1; x += 1.0) box(0.03, wallTop - wallBot, 0.02, lam(0x2c364b), x, (wallTop + wallBot) / 2, zBack + 0.0);
+      // Hintergrundrohre parallel zur Treppe
+      for (const [off, r, col] of [[1.75, 0.09, 0x6b7a99], [2.05, 0.06, 0xa85a3c], [2.3, 0.07, 0x4f8a6b]]) {
+        const mat = lam(col);
+        for (let i = 0; i < railPts.length - 1; i += 2) {
+          const [x0, y0] = railPts[i], [x1, y1] = railPts[Math.min(i + 2, railPts.length - 1)];
+          tube(V(x0, y0 + off, zBack + 0.12 + r), V(x1, y1 + off, zBack + 0.12 + r), r, mat);
+        }
+      }
+      // senkrechte Rohre mit roten Ventilrädern
+      for (let x = W.x0 + 1.4; x < W.x1; x += 3.2) {
+        const base = surfaceAt(W, x);
+        tube(V(x, wallBot, zBack + 0.15), V(x, wallTop, zBack + 0.15), 0.09, lam(0x7a8aa8));
+        const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.025, 4, 10), lam(0xe63946));
+        wheel.position.set(x, base + 1.3, zBack + 0.27); root.add(wheel);
+        this.anim.push((dt) => { wheel.rotation.z += dt * 0.4; });
+      }
+      // Warnschild und blinkende Warnlampe
+      box(0.7, 0.45, 0.03, lam(0xffd23f), W.x0 + 1.0, 1.9, zBack + 0.03);
+      box(0.6, 0.06, 0.035, lam(0x1b1030), W.x0 + 1.0, 1.97, zBack + 0.04);
+      box(0.45, 0.06, 0.035, lam(0x1b1030), W.x0 + 1.0, 1.83, zBack + 0.04);
+      const lamp = new THREE.Mesh(new THREE.IcosahedronGeometry(0.09, 0), lam(0x7a1f1f, { emissive: 0x000000 }));
+      lamp.position.set(W.x0 + 0.4, 2.4, zBack + 0.1); root.add(lamp);
+      this.anim.push(() => { const on = Math.sin(R.time * 6) > 0; lamp.material.emissive.setHex(on ? 0xff2020 : 0x000000); });
+    } else if (id === 'golf') {
+      // Hang hinter der Treppe (die Treppe ist in einen Hügel gebaut), Hecke und Bäume
+      const runs = [];
+      for (const b of W.blocks) { const r = runs[runs.length - 1]; if (r && Math.abs(r.top - b.top) < 0.001 && b.type !== 'pit') r.x1 = b.x1; else if (b.type !== 'pit') runs.push({ x0: b.x0, x1: b.x1, top: b.top }); else runs.push({ x0: b.x0, x1: b.x1, top: b.top + 0.45 }); }
+      for (const r of runs) {
+        box(r.x1 - r.x0 + 0.01, 1.6, 6, lam(0x5cb85c), (r.x0 + r.x1) / 2, r.top - 0.8 - 0.02, zBack - 3.0);
+        box(r.x1 - r.x0 + 0.01, 0.35, 0.3, lam(0x2f8a3a), (r.x0 + r.x1) / 2, r.top + 0.17, zBack - 0.2);
+      }
+      for (let x = W.x0 + 0.6; x < W.x1; x += 1.3 + rng() * 0.8) {
+        const z = zBack - 0.9 - rng() * 4, base = surfaceAt(W, x), h = 1.1 + rng() * 1.2;
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, h * 0.4, 5), lam(0x7a4b2a));
+        trunk.position.set(x, base + h * 0.2, z); root.add(trunk);
+        const crown = new THREE.Mesh(new THREE.ConeGeometry(0.35 + rng() * 0.25, h * 0.8, 6), lam(rng() > 0.5 ? 0x2f9e44 : 0x40b45a));
+        crown.position.set(x, base + h * 0.75, z); crown.castShadow = true; root.add(crown);
+      }
+      // weiße Pfosten an der Vorderkante
+      for (const b of W.blocks) for (let x = b.x0 + 0.15; x < b.x1; x += 0.5) {
+        const m = box(0.04, 0.45, 0.04, lam(0xffffff), x, b.top + 0.225, zFront); m.castShadow = true;
+      }
+      // Sonne
+      const sun = new THREE.Mesh(new THREE.IcosahedronGeometry(1.2, 1), new THREE.MeshBasicMaterial({ color: 0xfff3a8, fog: false }));
+      sun.position.set(W.x1 + 6, 9, -14); root.add(sun);
+    }
+
+    /* --- Vorderseite: Glasbrüstung (durchsichtig) und Handläufe (nicht im Golf-Level) --- */
+    if (id !== 'golf') {
+      const glass = new THREE.MeshLambertMaterial({ color: 0xbfe8ff, transparent: true, opacity: 0.13, depthWrite: false, side: THREE.DoubleSide });
+      for (const b of W.blocks) {
+        const w = b.x1 - b.x0, h = 0.95;
+        const g = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.01), glass);
+        g.position.set((b.x0 + b.x1) / 2, b.top + h / 2, zFront); root.add(g);
+      }
+      const steel = lam(P.steel), wallRail = lam(P.rail);
+      for (let i = 0; i < railPts.length - 1; i++) {
+        const [x0, y0] = railPts[i], [x1, y1] = railPts[i + 1];
+        const l = Math.hypot(x1 - x0, y1 - y0), ang = Math.atan2(y1 - y0, x1 - x0);
+        const m = box(l + 0.02, 0.035, 0.035, steel, (x0 + x1) / 2, (y0 + y1) / 2 + 0.97, zFront); m.rotation.z = ang;
+        const m2 = box(l + 0.02, 0.06, 0.06, wallRail, (x0 + x1) / 2, (y0 + y1) / 2 + 0.9, zBack + 0.1); m2.rotation.z = ang; m2.castShadow = true;
+      }
+    }
+    box(len + 8, 0.2, 12, lam(P.floor), cx, W.bottom - 1.75, 0);
+
+    /* --- Level-Extras: Rohre, Rampen, Baumstamm, Löcher, Fahnen, Windmühle --- */
+    for (const e of W.extras) {
+      if (e.kind === 'pipe') {
+        const m = tube(V(e.x, e.y, -STAIR_W / 2 - 0.15), V(e.x, e.y, STAIR_W / 2 + 0.15), e.r, lam(0x8c96a8)); m.castShadow = true;
+        for (const z of [-STAIR_W / 2 + 0.05, 0, STAIR_W / 2 - 0.05]) tube(V(e.x, e.y, z - 0.03), V(e.x, e.y, z + 0.03), e.r * 1.3, lam(0xffd23f));
+      } else if (e.kind === 'log') {
+        const m = tube(V(e.x, e.y + e.r, -STAIR_W / 2 + 0.05), V(e.x, e.y + e.r, STAIR_W / 2 - 0.05), e.r, lam(0x8a5a33), 7); m.castShadow = true;
+        for (const s of [-1, 1]) tube(V(e.x, e.y + e.r, s * (STAIR_W / 2 - 0.05)), V(e.x, e.y + e.r, s * (STAIR_W / 2 - 0.04)), e.r * 0.92, lam(0xe0b77a), 7);
+      } else if (e.kind === 'ramp') {
+        const sh = new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(e.x1 - e.x0, 0), new THREE.Vector2(e.x1 - e.x0, e.h)]);
+        const g = new THREE.ExtrudeGeometry(sh, { depth: STAIR_W, bevelEnabled: false });
+        const m = new THREE.Mesh(g, lam(0xe0a458));
+        m.position.set(e.x0, e.y, -STAIR_W / 2); m.castShadow = true; m.receiveShadow = true; root.add(m);
+      } else if (e.kind === 'cup') {
+        const x = (e.x0 + e.x1) / 2;
+        box(e.x1 - e.x0 - 0.04, 0.02, STAIR_W, lam(0xffffff), x, e.y + 0.01, 0);
+        flag3(root, x, e.y, 0, '★', this.anim);
+      } else if (e.kind === 'flag') {
+        flag3(root, e.x, e.y, -STAIR_W / 2 + 0.25, String(e.n), this.anim);
+      } else if (e.kind === 'windmill') {
+        const z = zBack - 0.6;
+        box(0.9, 1.45, 0.9, lam(0xf2d4a7), e.x, e.y + 0.72, z);
+        const roof = new THREE.Mesh(new THREE.ConeGeometry(0.75, 0.7, 4), lam(0xd1495b));
+        roof.position.set(e.x, e.y + 1.8, z); roof.rotation.y = Math.PI / 4; roof.castShadow = true; root.add(roof);
+        box(0.3, 0.45, 0.02, lam(0x5a3a22), e.x, e.y + 0.23, z + 0.46);
+        tube(V(e.x, e.y + 1.2, z), V(e.x, e.y + 1.2, STAIR_W / 2), 0.05, lam(0x2b2b38));
+      }
+    }
+
+    /* --- Zufallsereignisse: Bananenschale, Ventilator --- */
+    if (W.banana) {
+      const g = new THREE.Group(), y = lam(0xffe14d);
+      for (const a of [-0.6, 0.6, 2.4]) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.02, 0.035), y); p.position.set(Math.cos(a) * 0.05, 0.012, Math.sin(a) * 0.05); p.rotation.y = -a; g.add(p); }
+      const stem = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.05, 0.02), lam(0x6b4a1e)); stem.position.y = 0.03; g.add(stem);
+      g.position.set(W.banana.x, W.banana.y, W.banana.z); root.add(g);
+      this.banana = g;
+    } else this.banana = null;
+    if (W.fan) {
+      const f = W.fan, g = new THREE.Group();
+      const grey = lam(0x6b7a99);
+      const base = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.05, 0.3), grey); base.position.y = 0.025; g.add(base);
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.9, 6), grey); pole.position.y = 0.47; g.add(pole);
+      const head = new THREE.Group(); head.position.y = 0.95; g.add(head);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.02, 4, 12), lam(0xe8edf5)); head.add(ring);
+      const rotor = new THREE.Group(); head.add(rotor);
+      for (let i = 0; i < 3; i++) { const bl = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.09, 0.01), lam(0x3fd0ff)); bl.position.x = 0.13; const arm = new THREE.Group(); arm.rotation.z = (i * Math.PI * 2) / 3; arm.add(bl); rotor.add(arm); }
+      if (f.dir < 0) head.rotation.y = Math.PI;
+      g.position.set(f.x, f.y, f.z); g.traverse((m) => { if (m.isMesh) m.castShadow = true; });
+      root.add(g);
+      this.anim.push((dt) => {
+        rotor.rotation.z += dt * 22;
+        const live = G.state === 'fall' || G.state === 'twitch' || G.state === 'replay' || G.state === 'aim';
+        if (live && Math.random() < 0.6) FX.particles.push({ x: f.x + rnd(-1.2, 1.2), y: f.y + rnd(0.2, 1.8), z: f.z, vx: f.sx * 1.5, vy: 0, vz: f.dir * rnd(3, 5), life: 0.8, max: 0.8, size: 0.012, col: '#ffffff', kind: 'wind' });
+      });
+    }
+
+    Occl.setup(W, root, zBack);
+
+    /* --- bewegliche Teile: Windmühlen-Flügel, Requisiten, Kugel --- */
+    for (const wm of W.windmills) {
+      const g = new THREE.Group();
+      g.add(new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.1, STAIR_W - 0.3), lam(0x7b4321)));
+      for (const s of [-1, 1]) { const sail = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.02, STAIR_W - 0.5), lam(0xffffff)); sail.position.set(s * 0.52, 0.06 * s, 0); g.add(sail); }
+      g.traverse((m) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
+      root.add(g); this.dyn.push({ body: wm.blade, mesh: g });
+    }
+    if (W.pizzaBox) {
+      const g = new THREE.Group();
+      g.add(new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.06, 0.4), lam(0xe8c48f)));
+      const lab = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.005, 0.09), lam(0xe8343b)); lab.position.y = 0.032; g.add(lab);
+      root.add(g); this.dyn.push({ body: W.pizzaBox, mesh: g });
+      const s = new THREE.Group();
+      s.add(new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.025, 8), lam(0xe9a23b)));
+      const sauce = new THREE.Mesh(new THREE.CylinderGeometry(0.115, 0.115, 0.006, 8), lam(0xe63946)); sauce.position.y = 0.014; s.add(sauce);
+      for (const [x, z, c] of [[0.05, 0.03, 0xfff1b8], [-0.04, -0.05, 0xfff1b8], [-0.05, 0.05, 0x8b1e2a], [0.03, -0.06, 0x8b1e2a]]) { const t = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.006, 6), lam(c)); t.position.set(x, 0.019, z); s.add(t); }
+      root.add(s); this.dyn.push({ body: W.slice, mesh: s, show: () => W.flags.slice });
+    }
+    if (W.club) {
+      const g = new THREE.Group();
+      g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.76, 5), lam(0xc9d1de)));
+      const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.18, 5), lam(0x1b1030)); grip.position.y = 0.29; g.add(grip);
+      const head = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.05, 0.04), lam(0x8c96a8)); head.position.set(0.045, -0.38, 0); g.add(head);
+      root.add(g); this.dyn.push({ body: W.club, mesh: g });
+    }
+    if (W.ball) {
+      const g = new THREE.Group();
+      g.add(new THREE.Mesh(new THREE.IcosahedronGeometry(0.11, 1), lam(0x5b2fc4)));
+      for (const [a, b] of [[0.3, 0.2], [0.55, 0.05], [0.42, 0.42]]) { const h = new THREE.Mesh(new THREE.IcosahedronGeometry(0.018, 0), lam(0x111111)); h.position.setFromSphericalCoords(0.105, a, b); g.add(h); }
+      g.traverse((m) => { if (m.isMesh) m.castShadow = true; });
+      root.add(g); this.dyn.push({ body: W.ball, mesh: g, show: () => W.flags.ball });
+    }
+
+    /* --- Puppe --- */
+    this.buildDummy(W, root);
+    Cosmetics.reset(W, root);
+
+    /* --- Zielpfeil --- */
+    const arrow = (this.arrow = new THREE.Group());
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1, 6), lam(0x3fd0ff, { emissive: 0x0a3a4a }));
+    shaft.position.y = 0.5;
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.16, 6), lam(0x3fd0ff, { emissive: 0x0a3a4a }));
+    arrow.add(shaft, tip); arrow.userData = { shaft, tip };
+    root.add(arrow);
+    const stars = (this.stars = new THREE.Group());
+    for (let i = 0; i < 4; i++) stars.add(new THREE.Mesh(new THREE.OctahedronGeometry(0.035, 0), lam(i % 2 ? 0xffd23f : 0xffffff, { emissive: 0x555500 })));
+    root.add(stars);
+    this.sync(W);
+  },
+
+  /** Puppe mit Kleidung und Details je Typ */
+  buildDummy(W, root) {
+    this.meshes = {};
+    const dum = W.dummy.id, st = STYLES3[dum], black = 0x2b2b38;
+    const titan = W.powers.has('titan');
+    const add = (parent, geo, col, x, y, z) => { const m = new THREE.Mesh(geo, lam(col)); m.position.set(x, y, z); m.castShadow = true; parent.add(m); return m; };
+    for (const p of PARTS3) {
+      let col = partColor(st, p.id);
+      if (p.id === 'head' && titan) col = 0xc9d1de;
+      const c = shadeHex(col, p.side === 'L' ? 0.85 : 1);
+      const mat = new THREE.MeshLambertMaterial({ color: c, flatShading: true, emissive: 0x000000 });
+      const geo = p.r ? new THREE.IcosahedronGeometry(p.r * 1.03, 1) : new THREE.BoxGeometry(p.he[0] * 2, p.he[1] * 2, p.he[2] * 2);
+      const m = new THREE.Mesh(geo, mat);
+      m.castShadow = true; m.receiveShadow = true; m.userData.zone = p.zone;
+      root.add(m);
+      this.meshes[p.id] = m;
+      if (p.id.startsWith('forearm')) add(m, new THREE.IcosahedronGeometry(0.055, 0), st.hands, 0, -p.he[1] - 0.03, 0);
+      if (dum === 'crash' && /forearm|shin/.test(p.id)) add(m, new THREE.IcosahedronGeometry(p.he[0] * 1.25, 0), black, 0, p.he[1], 0);
+      if (p.id === 'belly') {
+        add(m, new THREE.BoxGeometry(0.21, 0.05, 0.31), st.belt, 0, 0.05, 0);
+        if (dum === 'office') add(m, new THREE.BoxGeometry(0.02, 0.04, 0.05), 0xd4a72c, 0.106, 0.05, 0);
+        if (dum === 'hero') add(m, new THREE.BoxGeometry(0.205, 0.12, 0.305), 0xe63946, 0, -0.07, 0);
+      }
+      if (p.id === 'chest') {
+        if (dum === 'crash') for (const s of [-1, 1]) { const t = add(m, new THREE.CylinderGeometry(0.06, 0.06, 0.01, 8), black, 0, 0.06, s * 0.186); t.rotation.x = Math.PI / 2; }
+        if (dum === 'hero') { const e = add(m, new THREE.CylinderGeometry(0.07, 0.07, 0.01, 6), 0xffd23f, 0.113, 0.04, 0); e.rotation.z = Math.PI / 2; }
+        if (dum === 'pizza') add(m, new THREE.BoxGeometry(0.225, 0.05, 0.365), 0xffffff, 0, -0.02, 0);
+        if (dum === 'golf') add(m, new THREE.BoxGeometry(0.03, 0.08, 0.1), 0xffffff, 0.105, 0.15, 0);
+        if (dum === 'office') add(m, new THREE.BoxGeometry(0.01, 0.34, 0.01), 0xc8ced8, 0.112, 0, 0.05);
+      }
+      if (p.id === 'head') this.buildHead(W, m, add, dum, st);
+    }
+  },
+  buildHead(W, m, add, dum, st) {
+    const black = 0x2b2b38, r = 0.12;
+    if (dum === 'crash') for (const s of [-1, 1]) { const t = add(m, new THREE.CylinderGeometry(0.045, 0.045, 0.01, 8), black, -0.02, 0.01, s * 0.126); t.rotation.x = Math.PI / 2; }
+    if (dum === 'office') { add(m, new THREE.BoxGeometry(0.2, 0.05, 0.22), 0x5b3a1e, -0.02, 0.1, 0); for (const s of [-1, 1]) add(m, new THREE.BoxGeometry(0.012, 0.035, 0.05), 0x111111, 0.125, 0.03, s * 0.045); add(m, new THREE.BoxGeometry(0.01, 0.008, 0.04), 0x111111, 0.125, 0.03, 0); }
+    if (dum === 'hero') { add(m, new THREE.BoxGeometry(0.24, 0.1, 0.25), 0x2f6bff, -0.01, 0.07, 0); add(m, new THREE.BoxGeometry(0.03, 0.05, 0.25), 0x1b1030, 0.105, 0.03, 0); }
+    if (dum === 'golf' || dum === 'pizza') {
+      const cap = dum === 'golf' ? 0xffffff : 0xe8343b;
+      const c = add(m, new THREE.CylinderGeometry(r * 0.95, r, 0.08, 8), cap, -0.005, 0.08, 0);
+      add(m, new THREE.BoxGeometry(0.12, 0.015, 0.16), cap, 0.11, 0.05, 0);
+      c.receiveShadow = true;
+      if (dum === 'pizza') add(m, new THREE.BoxGeometry(0.025, 0.02, 0.09), 0x3b2412, 0.118, -0.015, 0);
+    }
+    // Augen: normal oder benommen (Kreuze)
+    const eyes = new THREE.Group(), dizzy = new THREE.Group();
+    for (const s of [-1, 1]) {
+      const e = new THREE.Mesh(new THREE.IcosahedronGeometry(0.022, 0), lam(0xffffff)); e.position.set(0.105, 0.03, s * 0.045);
+      const pu = new THREE.Mesh(new THREE.IcosahedronGeometry(0.012, 0), lam(0x111111)); pu.position.set(0.018, 0, 0); e.add(pu);
+      eyes.add(e);
+      for (const rr of [0.8, -0.8]) { const x = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.05, 0.012), lam(0x111111)); x.position.set(0.118, 0.03, s * 0.045); x.rotation.x = rr; dizzy.add(x); }
+    }
+    add(m, new THREE.BoxGeometry(0.01, 0.012, 0.05), 0x111111, 0.112, -0.045, 0);
+    dizzy.visible = false; m.add(eyes, dizzy);
+    this.eyes = { eyes, dizzy };
+  },
+
+  /** Physik-Körper → Meshes */
+  sync(W) {
+    for (const p of PARTS3) {
+      const b = W.parts[p.id], m = this.meshes[p.id];
+      m.position.set(b.position.x, b.position.y, b.position.z);
+      m.quaternion.set(b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w);
+    }
+    for (const d of this.dyn) {
+      d.mesh.position.set(d.body.position.x, d.body.position.y, d.body.position.z);
+      d.mesh.quaternion.set(d.body.quaternion.x, d.body.quaternion.y, d.body.quaternion.z, d.body.quaternion.w);
+      d.mesh.visible = d.show ? !!d.show() : true;
+    }
+  },
+  render(W, dt) {
+    this.sync(W);
+    for (const fn of this.anim) fn(dt);
+    Cosmetics.update(W, dt);
+    if (this.banana) this.banana.visible = !W.flags.bananaGone;
+    const pulse = 0.5 + 0.5 * Math.sin(R.time * 8);
+    for (const p of PARTS3) {
+      const m = this.meshes[p.id], sel = G.state === 'aim' && p.zone === G.zone;
+      m.material.emissive.setRGB(0, sel ? 0.12 + pulse * 0.22 : 0, sel ? 0.2 + pulse * 0.3 : 0);
+    }
+    const ar = this.arrow;
+    ar.visible = G.state === 'aim';
+    if (ar.visible) {
+      const c = zoneCenter(W);
+      const a = (G.angle * Math.PI) / 180, len = 0.35 + (G.charging ? G.power : 0.3) * 1.1;
+      ar.position.set(c.x, c.y, c.z + 0.02);
+      ar.rotation.set(0, 0, a - Math.PI / 2);
+      ar.userData.shaft.scale.y = len; ar.userData.shaft.position.y = len / 2;
+      ar.userData.tip.position.y = len + 0.07;
+      const col = G.charging ? new THREE.Color().setHSL((120 - G.power * 120) / 360, 0.95, 0.55) : new THREE.Color(0x3fd0ff);
+      ar.userData.shaft.material.color.copy(col); ar.userData.tip.material.color.copy(col);
+    }
+    const dizzy = W.dizzyUntil > W.time || G.state === 'twitch' || (G.state === 'result' && G.score > 300);
+    this.eyes.eyes.visible = !dizzy; this.eyes.dizzy.visible = dizzy;
+    this.stars.visible = W.dizzyUntil > W.time;
+    if (this.stars.visible) {
+      const h = W.parts.head.position;
+      this.stars.children.forEach((s, i) => { const a = R.time * 5 + (i * Math.PI) / 2; s.position.set(h.x + Math.cos(a) * 0.2, h.y + 0.2, h.z + Math.sin(a) * 0.2); s.rotation.y = R.time * 4; });
+    }
+    const ch = W.parts.chest.position;
+    this.sun.position.set(ch.x + 2.5, ch.y + 6, ch.z + 3.5);
+    this.sun.target.position.set(ch.x, ch.y, ch.z);
+    Cam.apply(this.camera);
+    Occl.update(W, this.camera);
+    this.renderer.render(this.scene, this.camera);
+  },
+  resize() {
+    this.renderer.setPixelRatio(R.dpr);
+    this.renderer.setSize(R.W, R.H, false);
+    this.camera.aspect = R.W / R.H;
+    this.camera.updateProjectionMatrix();
+  },
+};
+
+/* ---------- Kulissen-Bausteine ---------- */
+function frame3(root, x, y, z, w, h, frameCol, picCol) {
+  const f = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.05), lam(frameCol)); f.position.set(x, y, z); f.receiveShadow = true; root.add(f);
+  const p = new THREE.Mesh(new THREE.BoxGeometry(w - 0.12, h - 0.12, 0.02), lam(picCol)); p.position.set(x, y, z + 0.03); root.add(p);
+  const head = new THREE.Mesh(new THREE.IcosahedronGeometry(Math.min(w, h) * 0.14, 0), lam(0x2b2b38)); head.position.set(x, y + h * 0.08, z + 0.05); root.add(head);
+}
+function trampoline3(root, b, box) {
+  const w = b.x1 - b.x0, mx = (b.x0 + b.x1) / 2;
+  box(w, 0.06, STAIR_W, lam(0x2b2b38), mx, b.top - 0.05, 0);
+  const mat = box(w - 0.06, 0.02, STAIR_W - 0.1, lam(0x3fd0ff, { emissive: 0x0a2a3a }), mx, b.top - 0.01, 0);
+  mat.userData.tramp = true;
+  for (const zs of [-1, 1]) for (const xs of [-1, 1]) box(0.05, 0.08, 0.05, lam(0xff4f8b), mx + xs * (w / 2 - 0.03), b.top - 0.01, zs * (STAIR_W / 2 - 0.04));
+}
+function flag3(root, x, y, z, label, anim) {
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 1.4, 5), lam(0xffffff));
+  pole.position.set(x, y + 0.7, z); pole.castShadow = true; root.add(pole);
+  const fl = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.22, 0.01), lam(0xff3b5c));
+  const g = new THREE.Group(); g.position.set(x, y + 1.27, z); fl.position.x = 0.18; g.add(fl); root.add(g);
+  fl.castShadow = true;
+  const ph = x * 3;
+  anim.push(() => { g.rotation.y = Math.sin(R.time * 3 + ph) * 0.35; });
+}
+function disposeTree(o) {
+  o.traverse((c) => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
+}
+function zoneCenter(W) {
+  const ps = W.partList.filter((b) => b.zone === G.zone);
+  const c = { x: 0, y: 0, z: 0 };
+  for (const b of ps) { c.x += b.position.x; c.y += b.position.y; c.z += b.position.z; }
+  c.x /= ps.length; c.y /= ps.length; c.z = Math.max(...ps.map((b) => b.position.z)) + 0.06;
+  return c;
+}
+
+/* ---------- Umhang und Krawatte: kleine Verlet-Ketten, als flache Streifen gezeichnet ---------- */
+const Cosmetics = {
+  chains: [],
+  reset(W, root) {
+    if (root) {
+      this.chains = [];
+      if (W.dummy.id === 'hero') this.chains.push(this.make(W, root, [-0.115, 0.17, 0], 6, 0.12, 0.36, 0xe63946));
+      if (W.dummy.id === 'office') this.chains.push(this.make(W, root, [0.118, 0.15, 0], 4, 0.07, 0.05, 0xd62839));
+    } else for (const c of this.chains) this.place(W, c);
+  },
+  make(W, root, anchor, n, seg, width, color) {
+    const c = { anchor: new THREE.Vector3(...anchor), n, seg, width, pts: [], meshes: [] };
+    for (let i = 0; i < n - 1; i++) {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(width, seg * 1.05, 0.012), new THREE.MeshLambertMaterial({ color, flatShading: true, side: THREE.DoubleSide }));
+      m.castShadow = true; root.add(m); c.meshes.push(m);
+    }
+    this.place(W, c);
+    return c;
+  },
+  place(W, c) {
+    const a = this.anchorW(W, c);
+    c.pts = [];
+    for (let i = 0; i < c.n; i++) { const p = { x: a.x, y: a.y - i * c.seg, z: a.z }; p.px = p.x; p.py = p.y; p.pz = p.z; c.pts.push(p); }
+  },
+  anchorW(W, c) {
+    const b = W.parts.chest;
+    const v = new CANNON.Vec3(c.anchor.x, c.anchor.y, c.anchor.z);
+    return b.pointToWorldFrame(v);
+  },
+  update(W, dt) {
+    const g = 9.82 * Math.min(dt, 0.033) ** 2;
+    const chest = W.parts.chest, q = chest.quaternion;
+    const lat = new THREE.Vector3(0, 0, 1).applyQuaternion(new THREE.Quaternion(q.x, q.y, q.z, q.w));
+    for (const c of this.chains) {
+      const a = this.anchorW(W, c);
+      for (let i = 1; i < c.n; i++) {
+        const p = c.pts[i];
+        const vx = (p.x - p.px) * 0.96, vy = (p.y - p.py) * 0.96, vz = (p.z - p.pz) * 0.96;
+        p.px = p.x; p.py = p.y; p.pz = p.z;
+        p.x += vx; p.y += vy - g; p.z += vz;
+      }
+      const p0 = c.pts[0]; p0.x = p0.px = a.x; p0.y = p0.py = a.y; p0.z = p0.pz = a.z;
+      for (let it = 0; it < 5; it++) {
+        for (let i = 1; i < c.n; i++) {
+          const p = c.pts[i], o = c.pts[i - 1];
+          const dx = p.x - o.x, dy = p.y - o.y, dz = p.z - o.z, d = Math.hypot(dx, dy, dz) || 1, k = (d - c.seg) / d;
+          if (i === 1) { p.x -= dx * k; p.y -= dy * k; p.z -= dz * k; }
+          else { p.x -= dx * k * 0.5; p.y -= dy * k * 0.5; p.z -= dz * k * 0.5; o.x += dx * k * 0.5; o.y += dy * k * 0.5; o.z += dz * k * 0.5; }
+        }
+        for (let i = 1; i < c.n; i++) { const p = c.pts[i], t = surfaceAt(W, p.x) + 0.01; if (p.y < t && p.y > t - 0.5) { p.y = t; p.py = t; } }
+      }
+      // Streifen ausrichten: y entlang des Segments, Breite entlang der Schulterachse
+      for (let i = 0; i < c.n - 1; i++) {
+        const A = c.pts[i], B = c.pts[i + 1], m = c.meshes[i];
+        const yv = new THREE.Vector3(A.x - B.x, A.y - B.y, A.z - B.z).normalize();
+        const xv = lat.clone().addScaledVector(yv, -lat.dot(yv)).normalize();
+        const zv = new THREE.Vector3().crossVectors(xv, yv);
+        m.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(xv, yv, zv));
+        m.position.set((A.x + B.x) / 2, (A.y + B.y) / 2, (A.z + B.z) / 2);
+      }
+    }
+  },
+};
+
+/* ---------- Durchsicht: Wände/Stufen zwischen Kamera und Puppe werden transparent ---------- */
+const Occl = {
+  items: [], zBack: 0, ray: new THREE.Raycaster(), stairMeshes: [],
+  /** Ordnet jedem Level-Mesh eine Gruppe zu: Rückwand, linke/rechte Stirnwand, Treppe, Boden */
+  setup(W, root, zBack) {
+    this.items = []; this.stairMeshes = []; this.zBack = zBack;
+    const bb = new THREE.Box3();
+    root.updateMatrixWorld(true);
+    root.traverse((m) => {
+      if (!m.isMesh || (m.material && m.material.transparent)) return;   // Glas bleibt, wie es ist
+      bb.setFromObject(m);
+      let cat;
+      if (bb.max.x < W.x0 + 0.01) cat = 'left';
+      else if (bb.min.x > W.x1 - 0.01) cat = 'right';
+      else if (bb.max.z <= zBack + 0.2) cat = 'back';
+      else if (bb.max.y < W.bottom - 1.5) cat = 'floor';
+      else if (Math.abs(bb.getCenter(new THREE.Vector3()).z) < 0.3 && bb.max.y - bb.min.y > 0 && bb.min.y < 0.1) cat = 'stair';
+      else cat = 'other';
+      m.userData.cat = cat; m.userData.op = 1; m.userData.cs = m.castShadow;
+      this.items.push(m);
+      if (cat === 'stair' || cat === 'floor') this.stairMeshes.push(m);
+    });
+  },
+  update(W, cam) {
+    const p = cam.position;
+    const fade = {
+      back: p.z < this.zBack - 0.08,
+      left: p.x < W.x0 - 0.3,
+      right: p.x > W.x1 + 0.3,
+      floor: p.y < W.bottom - 1.65,
+    };
+    // Stufen, die die Sicht auf Kopf oder Brust verdecken (z. B. Kamera unter der Treppe)
+    const hit = new Set();
+    // nur Stufen zwischen Kamera und Puppe prüfen (bei langen Treppen spart das viel Zeit)
+    const cx = W.parts.chest.position.x, xlo = Math.min(p.x, cx) - 1, xhi = Math.max(p.x, cx) + 1;
+    const near = this.stairMeshes.filter((m) => m.position.x > xlo && m.position.x < xhi);
+    for (const id of ['chest', 'head', 'belly']) {
+      const t = W.parts[id].position;
+      const dir = new THREE.Vector3(t.x - p.x, t.y - p.y, t.z - p.z);
+      const d = dir.length(); dir.normalize();
+      this.ray.set(p, dir); this.ray.far = d - 0.15;
+      for (const h of this.ray.intersectObjects(near, false)) hit.add(h.object);
+    }
+    const under = p.y < surfaceAt(W, clamp(p.x, W.x0, W.x1)) - 0.05;
+    for (const m of this.items) {
+      const c = m.userData.cat;
+      const want = fade[c] || hit.has(m) || (under && c === 'stair' && Math.abs(m.position.x - p.x) < 4) ? 0.16 : 1;
+      const op = (m.userData.op += (want - m.userData.op) * (1 - Math.exp(-(R.dt || 0.016) * 10)));
+      const mat = m.material, t = op < 0.985;
+      if (mat.transparent !== t) { mat.transparent = t; mat.depthWrite = !t; mat.needsUpdate = true; }
+      mat.opacity = t ? op : 1;
+      m.castShadow = m.userData.cs && !t;
+    }
+  },
+};
+
+/* ---------- Kamera: automatische Modi + frei drehbar ---------- */
+const CAM_MODES = ['follow', 'wide', 'close'];
+const CAM_NAMES = { follow: 'Verfolger', wide: 'Übersicht', close: 'Nahaufnahme' };
+const Cam = {
+  t: new THREE.Vector3(), yaw: 0.4, pitch: 0.15, dist: 4, // geglätteter Ist-Zustand
+  yawOff: 0, pitchOff: 0, distMul: 1,                       // Nutzer-Drehung
+  reset() { this.yawOff = 0; this.pitchOff = 0; this.distMul = 1; },
+  target() {
+    const W = G.W, ch = W.parts.chest.position, v = W.parts.chest.velocity;
+    const portrait = R.H > R.W;
+    const mode = G.state === 'aim' || G.state === 'menu' ? 'aim' : G.camMode;
+    if (mode === 'aim') return { x: DUMMY_X + 0.55, y: 0.95, z: 0, yaw: 0.5, pitch: 0.12, dist: portrait ? 5.4 : 3.8 };
+    if (mode === 'wide') {
+      const len = W.x1 - W.x0;
+      return { x: clamp(ch.x, W.x0 + 2, W.x1 - 2), y: (ch.y + surfaceAt(W, ch.x)) / 2 + 0.6, z: 0, yaw: 0.15, pitch: 0.28, dist: clamp(len * 0.42, 6, 13) * (portrait ? 1.5 : 1) };
+    }
+    if (mode === 'close') return { x: ch.x, y: ch.y, z: ch.z, yaw: 0.75, pitch: 0.12, dist: (2.1 - FX.punch * 0.9) * (portrait ? 1.4 : 1) };
+    return { x: ch.x + 0.6 + clamp(v.x * 0.15, -0.5, 0.8), y: ch.y - 0.2 + clamp(v.y * 0.1, -0.4, 0.4), z: 0, yaw: 0.3, pitch: 0.2, dist: (4.6 - FX.punch * 0.5) * (portrait ? 1.45 : 1) };
+  },
+  snap() { const t = this.target(); this.t.set(t.x, t.y, t.z); this.yaw = t.yaw; this.pitch = t.pitch; this.dist = t.dist; },
+  update(dt) {
+    const t = this.target(), k = 1 - Math.exp(-dt * 4.5);
+    this.t.x += (t.x - this.t.x) * k; this.t.y += (t.y - this.t.y) * k; this.t.z += (t.z - this.t.z) * k;
+    this.yaw += (t.yaw - this.yaw) * k; this.pitch += (t.pitch - this.pitch) * k;
+    this.dist += (t.dist - this.dist) * (1 - Math.exp(-dt * (t.dist < this.dist ? 9 : 3)));
+    FX.punch = Math.max(0, FX.punch - dt * 1.4);
+    FX.shake = Math.max(0, FX.shake - dt * 25);
+  },
+  apply(cam) {
+    const yaw = this.yaw + this.yawOff, pitch = clamp(this.pitch + this.pitchOff, -0.2, 1.35), d = this.dist * this.distMul;
+    const s = FX.shake * 0.004;
+    cam.position.set(
+      this.t.x + Math.sin(yaw) * Math.cos(pitch) * d + rnd(-s, s),
+      this.t.y + Math.sin(pitch) * d + rnd(-s, s),
+      this.t.z + Math.cos(yaw) * Math.cos(pitch) * d,
+    );
+    cam.lookAt(this.t);
+    // beim Zielen den Bildausschnitt über das Ziel-Panel schieben
+    const panel = document.getElementById('aimPanel');
+    const ph = G.state === 'aim' && !panel.classList.contains('hidden') ? panel.getBoundingClientRect().height : 0;
+    if (ph) cam.setViewOffset(R.W, R.H, 0, ph * 0.5, R.W, R.H); else cam.clearViewOffset();
+  },
+  cycle() {
+    const i = CAM_MODES.indexOf(G.camMode);
+    G.camMode = CAM_MODES[(i + 1) % CAM_MODES.length];
+    this.reset();
+    return CAM_NAMES[G.camMode];
+  },
+};
+
+/* ---------- Overlay: Partikel, Popups, Comics, Zeitlupe ---------- */
+const OV = { cv: null, ctx: null };
+const _v3 = new THREE.Vector3();
+function project(x, y, z) {
+  _v3.set(x, y, z).project(Scene3.camera);
+  return [(_v3.x * 0.5 + 0.5) * R.W, (-_v3.y * 0.5 + 0.5) * R.H, _v3.z < 1];
+}
+function updateParticles(dt) {
+  const s = dt * (G.state === 'fall' || G.state === 'replay' ? G.timeScale : 1);
+  for (let i = FX.particles.length - 1; i >= 0; i--) {
+    const p = FX.particles[i];
+    p.x += p.vx * s; p.y += p.vy * s; p.z += p.vz * s; p.vy -= (p.kind === 'wind' ? 0 : p.kind === 'dust' ? 2 : 9) * s;
+    p.life -= dt * Math.max(0.3, G.timeScale);
+    if (p.life <= 0) FX.particles.splice(i, 1);
+  }
+  for (let i = FX.popups.length - 1; i >= 0; i--) { const p = FX.popups[i]; p.life -= dt; p.y += dt * 0.35; if (p.life <= 0) FX.popups.splice(i, 1); }
+  for (let i = FX.comics.length - 1; i >= 0; i--) { FX.comics[i].life -= dt; if (FX.comics[i].life <= 0) FX.comics.splice(i, 1); }
+}
+function drawOverlay() {
+  const ctx = OV.ctx;
+  ctx.setTransform(R.dpr, 0, 0, R.dpr, 0, 0);
+  ctx.clearRect(0, 0, R.W, R.H);
+  const pxPerM = R.H / (2 * Math.tan((Scene3.camera.fov * Math.PI) / 360));
+  for (const p of FX.particles) {
+    const [sx, sy, ok] = project(p.x, p.y, p.z);
+    if (!ok) continue;
+    const d = Scene3.camera.position.distanceTo(_v3.set(p.x, p.y, p.z));
+    const r = Math.max(1, (p.size * pxPerM) / d);
+    ctx.globalAlpha = clamp((p.life / p.max) * 1.5, 0, 1);
+    if (p.kind === 'star') star2(ctx, sx, sy, r, p.col);
+    else { ctx.fillStyle = p.col; ctx.beginPath(); ctx.arc(sx, sy, r * (p.kind === 'dust' ? 1.6 - p.life / p.max : 1), 0, 7); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'center'; ctx.lineJoin = 'round';
+  for (const p of FX.popups) {
+    let [sx, sy, ok] = project(p.x, p.y, p.z);
+    if (!ok) continue;
+    sy -= p.lift;
+    const sc = p.life > 1.15 ? 1 + (p.life - 1.15) * 3 : 1;
+    ctx.globalAlpha = clamp(p.life / 0.4, 0, 1);
+    ctx.font = `900 ${(p.big ? 22 : 16) * sc}px Trebuchet MS, Arial`;
+    const hw = ctx.measureText(p.text).width / 2 + 8;
+    sx = clamp(sx, hw, Math.max(hw, R.W - hw));
+    ctx.strokeStyle = INK; ctx.lineWidth = 5; ctx.strokeText(p.text, sx, sy);
+    ctx.fillStyle = p.col; ctx.fillText(p.text, sx, sy);
+  }
+  ctx.globalAlpha = 1;
+  for (const c of FX.comics) {
+    const [sx, sy, ok] = project(c.x, c.y + 0.3, c.z);
+    if (!ok) continue;
+    const t = 1 - c.life / 0.9, sc = 0.8 * (t < 0.15 ? (t / 0.15) * 1.2 : 1.2 - (t - 0.15) * 0.25);
+    ctx.save(); ctx.translate(sx, sy); ctx.rotate(c.rot); ctx.scale(sc, sc);
+    ctx.globalAlpha = clamp(c.life / 0.25, 0, 1);
+    ctx.fillStyle = '#ffd23f'; ctx.strokeStyle = INK; ctx.lineWidth = 4;
+    ctx.beginPath();
+    for (let i = 0; i < 24; i++) { const a = (i * Math.PI) / 12, r = i % 2 ? 34 : 58; ctx.lineTo(Math.cos(a) * r * 1.35, Math.sin(a) * r * 0.8); }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.font = '900 30px Trebuchet MS, Arial'; ctx.lineWidth = 6; ctx.strokeText(c.text, 0, 10);
+    ctx.fillStyle = '#ff2d55'; ctx.fillText(c.text, 0, 10);
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+  if (G.timeScale < 0.8 && G.state === 'fall') {
+    const k = clamp((1 - G.timeScale) / 0.6, 0, 1), h = R.H * 0.07 * k;
+    ctx.fillStyle = `rgba(27,16,48,${0.85 * k})`; ctx.fillRect(0, 0, R.W, h); ctx.fillRect(0, R.H - h, R.W, h);
+    ctx.globalAlpha = k; ctx.font = '900 18px Trebuchet MS, Arial'; ctx.textAlign = 'left'; ctx.fillStyle = '#ffd23f';
+    ctx.fillText('🐌 ZEITLUPE', 16, R.H - h / 2 + 6); ctx.globalAlpha = 1;
+  }
+}
+function star2(ctx, x, y, r, col) {
+  ctx.fillStyle = col; ctx.strokeStyle = INK; ctx.lineWidth = 1.5; ctx.beginPath();
+  for (let i = 0; i < 10; i++) { const a = (i * Math.PI) / 5 - Math.PI / 2, rr = i % 2 ? r * 0.45 : r; ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); }
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+}
+
+/** Körperteil unter einem Bildschirmpunkt (Raycast) */
+const _ray = new THREE.Raycaster(), _ndc = new THREE.Vector2();
+/** Liegt der Punkt auf dem Zielpfeil? */
+function pickArrow(clientX, clientY) {
+  if (!Scene3.arrow.visible) return false;
+  _ndc.set((clientX / R.W) * 2 - 1, -(clientY / R.H) * 2 + 1);
+  _ray.setFromCamera(_ndc, Scene3.camera);
+  _ray.params.Mesh = {};
+  // dünner Pfeil → großzügige Trefferzone: Abstand des Strahls zur Pfeilachse
+  const c = zoneCenter(G.W), a = (G.angle * Math.PI) / 180, len = 0.35 + 0.3 * 1.1 + 0.16;
+  const p0 = new THREE.Vector3(c.x, c.y, c.z), p1 = new THREE.Vector3(c.x + Math.cos(a) * len, c.y + Math.sin(a) * len, c.z);
+  const d = _ray.ray.distanceSqToSegment(p0, p1);
+  return Math.sqrt(d) < 0.12;
+}
+/** Winkel aus einem Bildschirmpunkt: Schnitt des Blickstrahls mit der Wurfebene durch die gewählte Stelle */
+function angleFromScreen(clientX, clientY) {
+  _ndc.set((clientX / R.W) * 2 - 1, -(clientY / R.H) * 2 + 1);
+  _ray.setFromCamera(_ndc, Scene3.camera);
+  const c = zoneCenter(G.W), o = _ray.ray.origin, d = _ray.ray.direction;
+  if (Math.abs(d.z) < 0.02) return null;          // Kamera schaut genau seitlich auf die Ebene
+  const t = (c.z - o.z) / d.z;
+  if (t <= 0) return null;
+  const x = o.x + d.x * t - c.x, y = o.y + d.y * t - c.y;
+  if (Math.hypot(x, y) < 0.05) return null;
+  return clamp((Math.atan2(y, x) * 180) / Math.PI, -100, 100);
+}
+function pickZone(clientX, clientY) {
+  _ndc.set((clientX / R.W) * 2 - 1, -(clientY / R.H) * 2 + 1);
+  _ray.setFromCamera(_ndc, Scene3.camera);
+  const hit = _ray.intersectObjects(Object.values(Scene3.meshes), true)[0];
+  if (!hit) return null;
+  let o = hit.object;
+  while (o && !o.userData.zone) o = o.parent;
+  return o ? o.userData.zone : null;
+}
+
+/* ---------- Ergebnis-Silhouette (wie in 2D) ---------- */
+function rr(ctx, x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+function drawSilhouette(cv, zones) {
+  const c = cv.getContext('2d'), w = cv.width, h = cv.height;
+  c.clearRect(0, 0, w, h);
+  const max = Math.max(1, ...ZONES.map((z) => zones[z.id].pts));
+  const heat = (id) => (zones[id].pts <= 0 ? '#e8f7ee' : `hsl(${lerp(55, 0, zones[id].pts / max)},95%,${lerp(68, 50, zones[id].pts / max)}%)`);
+  c.save(); c.scale(w / 200, h / 330); c.lineWidth = 3; c.strokeStyle = INK; c.lineJoin = 'round';
+  const shape = (id, fn) => { c.fillStyle = heat(id); c.beginPath(); fn(); c.fill(); c.stroke(); };
+  shape('head', () => c.arc(100, 40, 24, 0, 7));
+  shape('neck', () => rr(c, 91, 63, 18, 16, 5));
+  shape('chest', () => rr(c, 68, 78, 64, 58, 14));
+  shape('belly', () => rr(c, 72, 134, 56, 46, 12));
+  shape('armR', () => { c.save(); c.translate(64, 84); c.rotate(0.18); rr(c, -9, 0, 18, 96, 9); c.restore(); });
+  shape('armL', () => { c.save(); c.translate(136, 84); c.rotate(-0.18); rr(c, -9, 0, 18, 96, 9); c.restore(); });
+  shape('legR', () => rr(c, 74, 178, 22, 112, 10));
+  shape('legL', () => rr(c, 104, 178, 22, 112, 10));
+  shape('footR', () => rr(c, 62, 290, 34, 14, 6));
+  shape('footL', () => rr(c, 104, 290, 34, 14, 6));
+  c.fillStyle = INK; c.beginPath(); c.arc(92, 37, 3, 0, 7); c.arc(108, 37, 3, 0, 7); c.fill();
+  c.beginPath(); c.arc(100, 50, 6, 0.2, Math.PI - 0.2); c.lineWidth = 2; c.stroke();
+  const tot = Math.max(1, ZONES.reduce((s, z) => s + zones[z.id].pts, 0));
+  c.font = '900 11px Trebuchet MS, Arial'; c.textAlign = 'center'; c.lineWidth = 3; c.strokeStyle = '#fff';
+  const lab = { head: [100, 44], chest: [100, 110], belly: [100, 160], armR: [56, 150], armL: [144, 150], legR: [85, 240], legL: [115, 240], footR: [79, 318], footL: [121, 318], neck: [134, 72] };
+  for (const z of ZONES) {
+    const p = Math.round((zones[z.id].pts / tot) * 100);
+    if (p <= 0) continue;
+    const [x, y] = lab[z.id];
+    c.strokeText(p + '%', x, y); c.fillStyle = INK; c.fillText(p + '%', x, y);
+  }
+  c.restore();
+  c.font = '900 20px Trebuchet MS, Arial'; c.fillStyle = INK; c.textAlign = 'left';
+  c.fillText('R', 12, 26); c.textAlign = 'right'; c.fillText('L', w - 12, 26);
+}
+/* =========================================================
+   BENUTZEROBERFLÄCHE: Menü, HUD, Ergebnis, Bestenliste, Eingaben
+   ========================================================= */
+const UI = {
+  lastScore: -1,
+  init() {
+    const word = (txt) => '<span class="word">' + [...txt].map((ch, i) => `<span class="l" style="transform:translateY(${i * 2.2}px);animation-delay:${i * 0.12}s">${ch}</span>`).join('') + '</span>';
+    $('logo').innerHTML = word('TREPPEN-') + word('CHAOS') + '&nbsp;' + word('3D') + '<br><span class="sub">Ragdoll Dismount</span>';
+    $('versionFoot').textContent = 'Version ' + VERSION + ' · Keine Testpuppen wurden ernsthaft verletzt.';
+    $('levelPicks').innerHTML = LEVELS.map((l) => `<button class="pick" data-level="${l.id}"><div class="ico">${l.ico}</div><b>${l.name}</b><small>${l.desc}</small></button>`).join('');
+    $('levelPicks').onclick = (e) => { const b = e.target.closest('[data-level]'); if (!b) return; G.levelId = b.dataset.level; Sound.click(); this.syncMenu(); preview(); };
+    $('dummyPicks').innerHTML = DUMMIES.map((d) => `<button class="pick" data-dummy="${d.id}"><div class="ico">${d.ico}</div><b>${d.name}</b><small>${d.trait}</small></button>`).join('')
+      + '<button class="pick" data-dummy="random"><div class="ico">🎲</div><b>Zufall</b><small>Jeder Wurf eine Überraschung</small></button>';
+    $('dummyPicks').onclick = (e) => { const b = e.target.closest('[data-dummy]'); if (!b) return; G.dummyChoice = b.dataset.dummy; Sound.click(); this.syncMenu(); preview(); };
+
+    const s = Store.data.settings;
+    if (s.musicVol != null) $('volMusic').value = s.musicVol;
+    if (s.sfxVol != null) $('volSfx').value = s.sfxVol;
+    if (s.slowmo != null) G.settings.slowmo = s.slowmo;
+    if (s.level && LEVEL[s.level]) G.levelId = s.level;
+    if (s.events != null) G.settings.events = s.events;
+    if (s.dummy && (s.dummy === 'random' || DUMMY[s.dummy])) G.dummyChoice = s.dummy;
+    const applyVol = () => {
+      Sound.musicVol = $('volMusic').value / 100; Sound.sfxVol = $('volSfx').value / 100; Sound.applyVolumes();
+      s.musicVol = +$('volMusic').value; s.sfxVol = +$('volSfx').value; Store.save();
+    };
+    $('volMusic').oninput = applyVol; $('volSfx').oninput = applyVol; applyVol();
+    const tog = (id, key) => { $(id).onclick = () => { G.settings[key] = !G.settings[key]; s[key] = G.settings[key]; Store.save(); Sound.click(); this.syncMenu(); }; };
+    tog('optSlowmo', 'slowmo'); tog('optEvents', 'events');
+
+    $('zoneSel').innerHTML = ZONES.map((z) => `<option value="${z.id}">${z.name} (×${String(z.mult).replace('.', ',')})</option>`).join('');
+    $('zoneSel').onchange = () => { G.zone = $('zoneSel').value; };
+    $('angle').oninput = () => this.setAngle(+$('angle').value);
+    $('powerups').innerHTML = POWERUPS.map((p) => `<button class="chip" data-pu="${p.id}" title="${p.tip}">${p.name}</button>`).join('');
+    $('powerups').onclick = (e) => {
+      const b = e.target.closest('[data-pu]'); if (!b || G.state !== 'aim') return;
+      const id = b.dataset.pu, pu = POWERUPS.find((p) => p.id === id);
+      G.powers.has(id) ? G.powers.delete(id) : G.powers.add(id);
+      Sound.click();
+      this.toast(G.powers.has(id) ? pu.name + ': ' + pu.tip : 'Power-Up aus', true);
+      const keep = { zone: G.zone, angle: G.angle, dummy: G.dummyId, yaw: Cam.yawOff, pitch: Cam.pitchOff, dist: Cam.distMul };
+      const choice = G.dummyChoice; G.dummyChoice = keep.dummy;   // gleiche Zufallspuppe behalten
+      newRun();                                                     // Puppe mit neuen Eigenschaften (Reibung, Abprall) aufbauen
+      G.dummyChoice = choice;
+      Cam.yawOff = keep.yaw; Cam.pitchOff = keep.pitch; Cam.distMul = keep.dist;
+    };
+
+    const pb = $('powerBtn');
+    pb.addEventListener('pointerdown', (e) => { e.preventDefault(); pb.setPointerCapture(e.pointerId); startCharge(); });
+    pb.addEventListener('pointerup', (e) => { e.preventDefault(); releaseCharge(); });
+    pb.addEventListener('pointercancel', () => releaseCharge());
+    pb.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    $('btnStart').onclick = () => { $('menu').classList.add('hidden'); newRun(); };
+    $('btnScoresMenu').onclick = () => this.showScores(G.levelId, 'menu');
+    $('btnCam').onclick = () => { $('camLabel').textContent = Cam.cycle(); };
+    $('btnSound').onclick = () => { Sound.muted = !Sound.muted; Sound.applyVolumes(); $('btnSound').textContent = Sound.muted ? '🔇' : '🔊'; };
+    $('btnReset').onclick = () => { if (G.state !== 'menu') { this.hideOverlays(); newRun(); } };
+    $('btnMenu').onclick = () => this.showMenu();
+    $('btnSkip').onclick = () => { if (G.state === 'fall' || G.state === 'twitch') finishRun(); };
+    $('btnAgain').onclick = () => { this.hideOverlays(); newRun(); };
+    $('btnReplay').onclick = () => startReplay();
+    $('btnReplaySkip').onclick = () => endReplay();
+    $('btnScores').onclick = () => this.showScores(G.levelId, 'result');
+    $('btnResMenu').onclick = () => this.showMenu();
+    $('btnScoresBack').onclick = () => { $('scores').classList.add('hidden'); $(this.scoresFrom === 'result' ? 'result' : 'menu').classList.remove('hidden'); };
+    $('camLabel').textContent = CAM_NAMES[G.camMode];
+    this.syncMenu();
+    this.bindCanvas();
+    this.bindKeys();
+  },
+  syncMenu() {
+    document.querySelectorAll('[data-level]').forEach((b) => b.classList.toggle('sel', b.dataset.level === G.levelId));
+    document.querySelectorAll('[data-dummy]').forEach((b) => b.classList.toggle('sel', b.dataset.dummy === G.dummyChoice));
+    for (const [id, key] of [['optSlowmo', 'slowmo'], ['optEvents', 'events']]) { $(id).classList.toggle('on', G.settings[key]); $(id).textContent = G.settings[key] ? 'AN' : 'AUS'; }
+    Store.data.settings.level = G.levelId; Store.data.settings.dummy = G.dummyChoice; Store.save();
+  },
+  setAngle(v) { G.angle = clamp(Math.round(v), -100, 100); $('angle').value = G.angle; $('angleVal').textContent = G.angle + '°'; },
+  setScore(n) {
+    n = Math.round(n);
+    if (n === this.lastScore) return;
+    this.lastScore = n;
+    $('scoreBox').innerHTML = fmt(n) + ' <small>Punkte</small>';
+  },
+  hideOverlays() { ['menu', 'result', 'scores'].forEach((id) => $(id).classList.add('hidden')); $('replayBar').classList.add('hidden'); },
+  showMenu() {
+    this.hideOverlays();
+    $('menu').classList.remove('hidden');
+    ['hud', 'aimPanel', 'fallBar'].forEach((id) => $(id).classList.add('hidden'));
+    preview();
+  },
+  enterAim() {
+    this.hideOverlays();
+    $('hud').classList.remove('hidden'); $('aimPanel').classList.remove('hidden'); $('fallBar').classList.add('hidden');
+    $('zoneSel').value = G.zone; this.setAngle(G.angle);
+    const d = G.W.dummy, best = Store.best(G.levelId, G.dummyId);
+    $('hudInfo').textContent = `${G.W.level.ico} ${G.W.level.name} · ${d.ico} ${d.name}` + (G.dummyChoice === 'random' ? ' 🎲' : '') + (best ? ` · 🏆 ${fmt(best)}` : '');
+    $('hudInfo').title = d.trait;
+    document.querySelectorAll('[data-pu]').forEach((b) => b.classList.toggle('on', G.powers.has(b.dataset.pu)));
+    this.setScore(0);
+    $('powerFill').style.width = '0%';
+    $('powerLabel').textContent = 'GEDRÜCKT HALTEN – LOSLASSEN = SCHUBS!';
+    $('hint').textContent = 'Puppe oder Pfeil ziehen = Winkel · Antippen = Stelle wählen · Hintergrund ziehen = Kamera drehen';
+    clearTimeout(this.hintT); this.hintT = setTimeout(() => { if (G.state === 'aim') $('hint').textContent = ''; }, 4000);
+    $('comboBox').className = ''; $('comboBox').style.opacity = 0;
+  },
+  enterFall() {
+    $('aimPanel').classList.add('hidden'); $('fallBar').classList.remove('hidden');
+    const names = { ball: '🎳 Bowlingkugel', banana: '🍌 Bananenschale', fan: '🌀 Ventilator', tramp: '🤸 Trampolin' };
+    $('hint').textContent = G.W.events.length ? 'Zufallsereignis: ' + G.W.events.map((e) => names[e]).join(' + ') : '';
+    clearTimeout(this.hintT); this.hintT = setTimeout(() => ($('hint').textContent = ''), 3500);
+  },
+  enterReplay() {
+    this.hideOverlays(); $('fallBar').classList.add('hidden'); $('aimPanel').classList.add('hidden');
+    $('replayBar').classList.remove('hidden'); $('hud').classList.remove('hidden');
+    $('hint').textContent = 'Ziehen = Kamera drehen';
+    clearTimeout(this.hintT); this.hintT = setTimeout(() => ($('hint').textContent = ''), 2500);
+    $('comboBox').className = ''; $('comboBox').style.opacity = 0;
+  },
+  charging(on) {
+    $('powerBtn').classList.toggle('charging', on);
+    if (!on) $('powerLabel').textContent = Math.round(G.power * 100) + ' %';
+  },
+  updatePowerBar() {
+    if (!G.charging) return;
+    $('powerFill').style.width = (G.power * 100).toFixed(1) + '%';
+    $('powerLabel').textContent = Math.round(G.power * 100) + ' % – JETZT LOSLASSEN!';
+  },
+  combo(m) {
+    const el = $('comboBox');
+    el.textContent = `Ragdoll-Rallye x${m}!`;
+    el.className = ''; void el.offsetWidth; el.className = 'show';
+    clearTimeout(this.comboT); this.comboT = setTimeout(() => { el.className = 'fade'; }, 1300);
+  },
+  toast(text, quiet) {
+    const t = document.createElement('div');
+    t.className = 'toast'; t.textContent = text;
+    if (quiet) t.style.background = '#fff';
+    $('toasts').appendChild(t); setTimeout(() => t.remove(), 3100);
+  },
+  showResult(res, fromReplay) {
+    $('fallBar').classList.add('hidden'); $('aimPanel').classList.add('hidden'); $('replayBar').classList.add('hidden');
+    $('result').classList.remove('hidden');
+    if (fromReplay) return;          // Inhalt ist schon befüllt
+    const run = G.run;
+    $('resTotal').textContent = fmt(res.total);
+    $('resRecord').innerHTML = res.rank === 1 && res.total > 0 ? '<span class="newRecord">NEUER REKORD!</span>' : res.rank && res.rank <= 10 ? `<span class="newRecord" style="background:var(--cyan);color:var(--ink)">Platz ${res.rank}</span>` : '';
+    $('resSub').textContent = `${res.level.ico} ${res.level.name} · ${res.dummy.ico} ${res.dummy.name}` + (G.powers.size ? ' · ' + [...G.powers].map((p) => POWERUPS.find((x) => x.id === p).name.split(' ')[0]).join('') : '');
+    $('resStamp').textContent = res.total >= 10000 ? 'TOTALSCHADEN' : res.total >= 3000 ? 'SCHWER LÄDIERT' : res.total >= 500 ? 'VERBEULT' : 'KRATZER';
+    const stats = [['Stufen', `${res.steps} / ${res.stepTotal}`], ['Aufpralle', fmt(run.impacts)], ['Bester Treffer', fmt(run.best.pts) + ' P'], ['Max. Combo', 'x' + run.combo.max]];
+    $('resStats').innerHTML = stats.map(([k, v]) => `<div class="stat"><small>${k}</small><b>${v}</b></div>`).join('')
+      + `<div class="stat" style="grid-column:1/-1"><small>Bester einzelner Aufprall</small><b>${run.best.pts ? run.best.label + ' – ' + fmt(run.best.pts) + ' Punkte' : '–'}</b></div>`;
+    const sum = Math.max(1, ZONES.reduce((s, z) => s + run.zones[z.id].pts, 0)), maxZ = Math.max(1, ...ZONES.map((z) => run.zones[z.id].pts));
+    $('resZones').innerHTML = ZONES.map((z) => {
+      const d = run.zones[z.id];
+      return `<tr><td>${z.name}</td><td class="num">${fmt(d.pts)}</td><td class="num">${Math.round((d.pts / sum) * 100)}</td><td class="num">${d.hits}</td><td style="width:28%"><div class="bar"><i style="width:${(d.pts / maxZ) * 100}%"></i></div></td></tr>`;
+    }).join('') + (run.bonus ? `<tr><td>Boni (Banane, Loch, Karton)</td><td class="num">${fmt(run.bonus)}</td><td></td><td></td><td></td></tr>` : '');
+    $('resMedical').innerHTML = '<b>🩺 Ärztliches Gutachten</b>' + res.comments.map((c) => `<p>• ${c}</p>`).join('');
+    $('resBadges').innerHTML = res.achievements.map((id) => `<span class="badge">🏅 ${ACH[id].name}</span>`).join('');
+    drawSilhouette($('silhouette'), run.zones);
+    $('result').scrollTop = 0;
+  },
+  showScores(levelId, from) {
+    this.scoresFrom = from;
+    $('menu').classList.add('hidden'); $('result').classList.add('hidden'); $('scores').classList.remove('hidden');
+    const render = (lid) => {
+      $('scoreTabs').innerHTML = LEVELS.map((l) => `<button class="tab ${l.id === lid ? 'sel' : ''}" data-tab="${l.id}">${l.ico} ${l.name}</button>`).join('');
+      const sc = Store.data.scores[lid] || {};
+      $('scoreBoards').innerHTML = DUMMIES.map((d) => {
+        const list = sc[d.id] || [];
+        return `<div class="board"><b>${d.ico} ${d.name}</b>` + (list.length
+          ? '<ol>' + list.slice(0, 5).map((e) => `<li>${fmt(e.score)} <span>· ${e.steps} Stufen · ${e.date}</span></li>`).join('') + '</ol>'
+          : '<div class="empty">Noch kein Sturz.</div>') + '</div>';
+      }).join('');
+    };
+    render(levelId);
+    $('scoreTabs').onclick = (e) => { const b = e.target.closest('[data-tab]'); if (b) render(b.dataset.tab); };
+    const got = Store.data.achievements;
+    $('achCount').textContent = `(${ACHIEVEMENTS.filter((a) => got[a.id]).length}/${ACHIEVEMENTS.length})`;
+    $('achList').innerHTML = ACHIEVEMENTS.map((a) => `<span class="badge ${got[a.id] ? '' : 'locked'}" title="${a.desc}">${got[a.id] ? '🏅' : '🔒'} ${a.name}</span>`).join('');
+  },
+
+  /* ---------- Canvas: ziehen = Kamera drehen, antippen = Stelle wählen, Pinch/Rad = Zoom ---------- */
+  bindCanvas() {
+    const cv = $('game');
+    const ptrs = new Map();
+    let start = null, pinch0 = 0, dist0 = 1;
+    cv.addEventListener('pointerdown', (e) => {
+      cv.setPointerCapture(e.pointerId);
+      ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (ptrs.size === 1) {
+        // Ziehen an Puppe oder Pfeil = Winkel einstellen, sonst Kamera drehen
+        const zone = G.state === 'aim' ? pickZone(e.clientX, e.clientY) : null;
+        const onArrow = G.state === 'aim' && !zone && pickArrow(e.clientX, e.clientY);
+        start = { x: e.clientX, y: e.clientY, moved: false, zone, aim: !!(zone || onArrow) };
+        if (onArrow) { start.moved = true; this.dragAngle(e); }
+      }
+      if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch0 = Math.hypot(a.x - b.x, a.y - b.y); dist0 = Cam.distMul; if (start) { start.moved = true; start.aim = false; } }
+    });
+    cv.addEventListener('pointermove', (e) => {
+      if (!ptrs.has(e.pointerId)) return;
+      const prev = ptrs.get(e.pointerId);
+      ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (ptrs.size === 2) {
+        const [a, b] = [...ptrs.values()];
+        Cam.distMul = clamp(dist0 * (pinch0 / Math.max(20, Math.hypot(a.x - b.x, a.y - b.y))), 0.4, 2.5);
+        return;
+      }
+      if (start && !start.moved && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 7) start.moved = true;
+      if (!start || !start.moved) return;
+      if (start.aim && G.state === 'aim') this.dragAngle(e);
+      else {
+        Cam.yawOff -= (e.clientX - prev.x) * 0.008;
+        Cam.pitchOff = clamp(Cam.pitchOff + (e.clientY - prev.y) * 0.006, -0.5, 1.2);
+      }
+    });
+    const up = (e) => {
+      if (start && !start.moved && start.zone && ptrs.size === 1 && G.state === 'aim') {
+        G.zone = start.zone; $('zoneSel').value = start.zone; Sound.click();
+      }
+      ptrs.delete(e.pointerId);
+      if (!ptrs.size) { start = null; cv.style.cursor = ''; }
+    };
+    cv.addEventListener('pointerup', up);
+    cv.addEventListener('pointercancel', (e) => { ptrs.delete(e.pointerId); start = null; });
+    cv.addEventListener('wheel', (e) => { e.preventDefault(); Cam.distMul = clamp(Cam.distMul * (1 + e.deltaY * 0.001), 0.4, 2.5); }, { passive: false });
+    // Mauszeiger zeigt an, was Ziehen bewirkt
+    cv.addEventListener('pointermove', (e) => {
+      if (ptrs.size || e.pointerType !== 'mouse') return;
+      cv.style.cursor = G.state === 'aim' && (pickZone(e.clientX, e.clientY) || pickArrow(e.clientX, e.clientY)) ? 'crosshair' : 'grab';
+    });
+  },
+  /** Winkel aus der Mausposition in der Wurfebene setzen */
+  dragAngle(e) {
+    const a = angleFromScreen(e.clientX, e.clientY);
+    if (a !== null) this.setAngle(a);
+  },
+  bindKeys() {
+    window.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' && e.target.type !== 'range') return;
+      const k = e.key;
+      if (k === ' ' || k === 'Spacebar') { e.preventDefault(); if (!e.repeat && G.state === 'aim') startCharge(); }
+      else if ((k === 'ArrowUp' || k === 'ArrowRight') && G.state === 'aim') { e.preventDefault(); this.setAngle(G.angle + (e.shiftKey ? 10 : 2)); }
+      else if ((k === 'ArrowDown' || k === 'ArrowLeft') && G.state === 'aim') { e.preventDefault(); this.setAngle(G.angle - (e.shiftKey ? 10 : 2)); }
+      else if (k === 'r' || k === 'R') { if (G.state !== 'menu') { this.hideOverlays(); newRun(); } }
+      else if (k === 'c' || k === 'C') { $('camLabel').textContent = Cam.cycle(); }
+      else if (k === 'Escape') { if (G.state === 'replay') endReplay(); else if (G.state !== 'menu') this.showMenu(); }
+      else if (k === 'Tab' && G.state === 'aim') {
+        e.preventDefault();
+        const i = ZONES.findIndex((z) => z.id === G.zone);
+        G.zone = ZONES[(i + (e.shiftKey ? ZONES.length - 1 : 1)) % ZONES.length].id; $('zoneSel').value = G.zone;
+      } else if (k === 'Enter' && G.state === 'result') { this.hideOverlays(); newRun(); }
+    });
+    window.addEventListener('keyup', (e) => { if (e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); releaseCharge(); } });
+  },
+};
+/* =========================================================
+   START & HAUPTSCHLEIFE
+   ========================================================= */
+function preview() {
+  newRun(true);
+  ['hud', 'aimPanel', 'fallBar'].forEach((id) => $(id).classList.add('hidden'));
+  $('hint').textContent = '';
+}
+function resize() {
+  R.dpr = Math.min(window.devicePixelRatio || 1, 2);
+  R.W = window.innerWidth; R.H = window.innerHeight;
+  Scene3.resize();
+  OV.cv.width = Math.round(R.W * R.dpr); OV.cv.height = Math.round(R.H * R.dpr);
+}
+let lastT = 0;
+function frame(t) {
+  const dt = Math.min(0.05, (t - lastT) / 1000 || 0.016);
+  lastT = t; R.time += dt; R.dt = dt;
+  if (G.state === 'aim') { updateCharge(dt); UI.updatePowerBar(); }
+  if (G.state === 'fall' || G.state === 'twitch') { updateSim(dt); UI.setScore(G.score); }
+  if (G.state === 'replay') updateReplay();
+  if (G.W) {
+    updateParticles(dt);
+    Cam.update(dt);
+    Scene3.render(G.W, dt);
+    updateLoops(G.W);
+    drawOverlay();
+  }
+  requestAnimationFrame(frame);
+}
+/** Dauergeräusche: Ventilator und rollende Bowlingkugel */
+function updateLoops(W) {
+  if (!(G.state === 'fall' || G.state === 'twitch' || G.state === 'replay')) return;
+  const ch = W.parts.chest.position;
+  if (W.fan) {
+    Sound.loop('fan', 'bandpass', 700);
+    Sound.loopLevel('fan', clamp(1 - Math.hypot(ch.x - W.fan.x, ch.y - W.fan.y) / 4, 0.05, 1) * 0.35);
+  }
+  if (W.ball && W.flags.ball) {
+    Sound.loop('ball', 'lowpass', 160);
+    Sound.loopLevel('ball', clamp((G.state === 'replay' ? 3 : W.ball.velocity.length()) / 5, 0, 1) * 0.6);
+  }
+}
+function boot() {
+  Store.load();
+  Scene3.init($('game'));
+  OV.cv = $('overlay'); OV.ctx = OV.cv.getContext('2d');
+  resize();
+  window.addEventListener('resize', resize);
+  window.addEventListener('orientationchange', () => setTimeout(resize, 200));
+  const unlockAudio = () => Sound.unlock();
+  ['pointerdown', 'keydown', 'touchstart'].forEach((ev) => window.addEventListener(ev, unlockAudio, { passive: true }));
+  document.addEventListener('visibilitychange', () => { if (Sound.ctx) document.hidden ? Sound.ctx.suspend() : Sound.ctx.resume(); });
+  UI.init();
+  preview();
+  requestAnimationFrame(frame);
+  window.TC = { G, launch, newRun, finishRun, updateSim, UI, Cam, R, Scene3, physStep, preview, startReplay, endReplay };
+}
+boot();
+</script>
+</body></html>
+<!--
+  ================================================================
+  ANLEITUNG: Datei speichern und im Browser öffnen
+  ================================================================
+  1. Diese Datei als „treppen-chaos-3d.html“ speichern (Endung .html).
+  2. Doppelklick auf die Datei – sie öffnet sich im Standardbrowser
+     (Chrome, Edge, Firefox oder Safari, jeweils aktuell, mit WebGL).
+  3. Beim ersten Start werden three.js und cannon-es aus dem Internet
+     (jsDelivr) geladen; danach liegen sie meist im Browser-Cache.
+  4. Am Handy: Datei per Mail/Cloud aufs Gerät bringen und im Browser öffnen.
+  Ton startet erst nach dem ersten Tippen oder Klicken.
+-->
