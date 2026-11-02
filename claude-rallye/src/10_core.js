@@ -1,7 +1,7 @@
 /* =====================================================================
    1  GRUNDLAGEN
    ===================================================================== */
-const VERSION = '1.7.0';
+const VERSION = '1.7.1';
 const W = 1280, H = 800;              // Weltgröße in Pixeln (eine Strecke = ein Bildschirm)
 const PANEL = 260;                    // Breite der Seitenleiste
 const CW = W + PANEL;                 // Canvas-Gesamtbreite
@@ -12,6 +12,7 @@ const LINE_STEP = 6;                  // Punktabstand der KI-Linie
 const PIT_LIMIT = 95;                 // Tempolimit Boxengasse (px/s)
 const LAT = 620;                      // Grundwert Seitenhaftung (px/s²)
 const MAX_CARS = 8;
+let RK = 1;                            // Zeichenauflösung der Bühne (wird in resize() gesetzt)
 
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;

@@ -247,7 +247,7 @@ kbd{background:#0f141d;border:1px solid var(--line);border-bottom-width:2px;bord
 /* =====================================================================
    1  GRUNDLAGEN
    ===================================================================== */
-const VERSION = '1.7.0';
+const VERSION = '1.7.1';
 const W = 1280, H = 800;              // Weltgröße in Pixeln (eine Strecke = ein Bildschirm)
 const PANEL = 260;                    // Breite der Seitenleiste
 const CW = W + PANEL;                 // Canvas-Gesamtbreite
@@ -258,6 +258,7 @@ const LINE_STEP = 6;                  // Punktabstand der KI-Linie
 const PIT_LIMIT = 95;                 // Tempolimit Boxengasse (px/s)
 const LAT = 620;                      // Grundwert Seitenhaftung (px/s²)
 const MAX_CARS = 8;
+let RK = 1;                            // Zeichenauflösung der Bühne (wird in resize() gesetzt)
 
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -4604,6 +4605,7 @@ const Rally = {
     const c = this.cur;
     const R = (c.pre && c.pre[c.sec]) || createRace(this.cfg());
     if (c.pre) c.pre[c.sec] = null;
+    cycleCameraRes(R);
     Particles.clear();
     R.state = 'running'; R.cd = 0; R.t = 0; R.goT = 0; R.lastBeep = 0;
     const car = R.cars[0], rt = R.rt, inP = c.stage.sections[c.sec].in, d = edgeDir(inP);
@@ -4714,16 +4716,27 @@ const getRecords = id => store.get('cr_lb_' + id, []);
 /** Zoomstufe der Kamera laut Optionen (1 = aus). */
 const CAM_ZOOM = [1, 1.55, 2.1];
 const camZoom = () => CAM_ZOOM[Options.data.camera != null ? Options.data.camera : 1] || 1;
+/** Auflösung der vorberechneten Szene: so fein, dass sie auf dem Bildschirm (Bühnen-Skalierung × Pixeldichte × Zoom) scharf bleibt. */
+function sceneRes(solo, demo) {
+  const z = solo && !demo && camZoom() > 1 ? camZoom() : 1;
+  const max = demo ? 2 : Touch.detect() ? 2 : 3;
+  return clamp(Math.ceil(RK * z - 0.2), 1, max);
+}
+/** Szene neu in höherer Auflösung bauen, falls die aktuelle nicht mehr reicht (Zoom/Fenstergröße geändert). */
+function cycleCameraRes(race) {
+  const need = sceneRes(race.cars.filter(c => c.human >= 0).length === 1, race.mode === 'demo');
+  if (need <= race.layers.rs) return;
+  const old = race.skid;
+  const flags = race.layers.dyn.filter(o => o.t === 'cpflag');
+  race.layers = buildScene(race.rt.src, race.rt, { checkpoints: Options.data.showCps && race.mode !== 'demo', rs: need }, race.weather);
+  race.layers.dyn.push(...flags);
+  race.skid = document.createElement('canvas'); race.skid.width = W * need; race.skid.height = H * need;
+  race.skidCtx = race.skid.getContext('2d'); race.skidCtx.drawImage(old, 0, 0, W * need, H * need); race.skidCtx.setTransform(need, 0, 0, need, 0, 0);
+}
 /** Kamera im Rennen umschalten (Taste C / Pausenmenü); Szene bei Bedarf in hoher Auflösung neu bauen. */
 function cycleCamera(race) {
   const o = Options.data; o.camera = ((o.camera != null ? o.camera : 1) + 1) % CAM_ZOOM.length; Options.save();
-  if (race && camZoom() > 1 && race.layers.rs === 1 && race.cars.filter(c => c.human >= 0).length === 1) {
-    const rs = 2, old = race.skid;
-    race.layers = buildScene(race.rt.src, race.rt, { checkpoints: Options.data.showCps, rs }, race.weather);
-    race.skid = document.createElement('canvas'); race.skid.width = W * rs; race.skid.height = H * rs;
-    race.skidCtx = race.skid.getContext('2d'); race.skidCtx.drawImage(old, 0, 0, W * rs, H * rs); race.skidCtx.setTransform(rs, 0, 0, rs, 0, 0);
-  }
-  if (race) race.cam = null;
+  if (race) { cycleCameraRes(race); race.cam = null; }
   toast('Kamera: ' + ['Ganze Strecke (Zoom aus)', 'Folgen', 'Nah'][o.camera]);
 }
 
@@ -4750,7 +4763,7 @@ function createRace(cfg) {
     }
   }
   // Zoom-Kamera (nur allein): Szene in doppelter Auflösung, damit sie vergrößert scharf bleibt
-  const rs = cfg.mode !== 'demo' && cfg.players.length === 1 && camZoom() > 1 ? 2 : 1;
+  const rs = sceneRes(cfg.players.length === 1, cfg.mode === 'demo');
   const layers = buildScene(rt.src, rt, { checkpoints: Options.data.showCps && cfg.mode !== 'demo', rs }, wx);
   const skid = document.createElement('canvas'); skid.width = W * rs; skid.height = H * rs;
   const skidCtx = skid.getContext('2d'); skidCtx.setTransform(rs, 0, 0, rs, 0, 0);
@@ -5332,7 +5345,7 @@ function drawRace(ctx, race) {
   if (cam) {
     // Welt direkt vergrößert zeichnen (Vektorgrafik bleibt scharf, Szene liegt in doppelter Auflösung vor)
     ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip();
-    ctx.setTransform(cam.z, 0, 0, cam.z, -cam.x0 * cam.z, -cam.y0 * cam.z);
+    ctx.setTransform(cam.z * RK, 0, 0, cam.z * RK, -cam.x0 * cam.z * RK, -cam.y0 * cam.z * RK);
   }
   const L = race.layers, wx = race.weather;
   ctx.drawImage(L.scene, 0, 0, W, H);
@@ -5365,7 +5378,7 @@ function drawRace(ctx, race) {
   if (cam) {
     // Beschriftungen: Schrift nur mäßig mitvergrößern
     const lz = Math.sqrt(cam.z);
-    ctx.setTransform(lz, 0, 0, lz, 0, 0);
+    ctx.setTransform(lz * RK, 0, 0, lz * RK, 0, 0);
     race.camMap = (X, Y) => [((X - cam.x0) * cam.z) / lz, ((Y - cam.y0) * cam.z) / lz];
   } else race.camMap = null;
   const map = (X, Y) => race.camMap ? race.camMap(X, Y) : [X, Y];
@@ -7079,6 +7092,7 @@ const Game = {
   },
   render() {
     const ctx = $('game').getContext('2d');
+    ctx.setTransform(RK, 0, 0, RK, 0, 0);
     if (this.state === 'menu') {
       if (this.demo) drawRace(ctx, this.demo);
       ctx.fillStyle = '#0b0f16'; ctx.fillRect(W, 0, PANEL, H);
@@ -7097,6 +7111,12 @@ function resize() {
   const s = Math.min(window.innerWidth / CW, window.innerHeight / H);
   const st = $('stage');
   st.style.transform = `translate(${(window.innerWidth - CW * s) / 2}px, ${(window.innerHeight - H * s) / 2}px) scale(${s})`;
+  // Zeichenfläche in Bildschirmauflösung (Bühnen-Skalierung × Pixeldichte), sonst wird alles hochskaliert und unscharf
+  const k = clamp(Math.round(s * (window.devicePixelRatio || 1) * 4) / 4, 1, Touch.detect() ? 2 : 3);
+  if (k !== RK) {
+    RK = k; const cv = $('game'); cv.width = Math.round(CW * k); cv.height = Math.round(H * k);
+    const R = Game.race; if (R && Game.state === 'race') cycleCameraRes(R);
+  }
 }
 window.addEventListener('resize', resize);
 

@@ -16,16 +16,27 @@ const getRecords = id => store.get('cr_lb_' + id, []);
 /** Zoomstufe der Kamera laut Optionen (1 = aus). */
 const CAM_ZOOM = [1, 1.55, 2.1];
 const camZoom = () => CAM_ZOOM[Options.data.camera != null ? Options.data.camera : 1] || 1;
+/** Auflösung der vorberechneten Szene: so fein, dass sie auf dem Bildschirm (Bühnen-Skalierung × Pixeldichte × Zoom) scharf bleibt. */
+function sceneRes(solo, demo) {
+  const z = solo && !demo && camZoom() > 1 ? camZoom() : 1;
+  const max = demo ? 2 : Touch.detect() ? 2 : 3;
+  return clamp(Math.ceil(RK * z - 0.2), 1, max);
+}
+/** Szene neu in höherer Auflösung bauen, falls die aktuelle nicht mehr reicht (Zoom/Fenstergröße geändert). */
+function cycleCameraRes(race) {
+  const need = sceneRes(race.cars.filter(c => c.human >= 0).length === 1, race.mode === 'demo');
+  if (need <= race.layers.rs) return;
+  const old = race.skid;
+  const flags = race.layers.dyn.filter(o => o.t === 'cpflag');
+  race.layers = buildScene(race.rt.src, race.rt, { checkpoints: Options.data.showCps && race.mode !== 'demo', rs: need }, race.weather);
+  race.layers.dyn.push(...flags);
+  race.skid = document.createElement('canvas'); race.skid.width = W * need; race.skid.height = H * need;
+  race.skidCtx = race.skid.getContext('2d'); race.skidCtx.drawImage(old, 0, 0, W * need, H * need); race.skidCtx.setTransform(need, 0, 0, need, 0, 0);
+}
 /** Kamera im Rennen umschalten (Taste C / Pausenmenü); Szene bei Bedarf in hoher Auflösung neu bauen. */
 function cycleCamera(race) {
   const o = Options.data; o.camera = ((o.camera != null ? o.camera : 1) + 1) % CAM_ZOOM.length; Options.save();
-  if (race && camZoom() > 1 && race.layers.rs === 1 && race.cars.filter(c => c.human >= 0).length === 1) {
-    const rs = 2, old = race.skid;
-    race.layers = buildScene(race.rt.src, race.rt, { checkpoints: Options.data.showCps, rs }, race.weather);
-    race.skid = document.createElement('canvas'); race.skid.width = W * rs; race.skid.height = H * rs;
-    race.skidCtx = race.skid.getContext('2d'); race.skidCtx.drawImage(old, 0, 0, W * rs, H * rs); race.skidCtx.setTransform(rs, 0, 0, rs, 0, 0);
-  }
-  if (race) race.cam = null;
+  if (race) { cycleCameraRes(race); race.cam = null; }
   toast('Kamera: ' + ['Ganze Strecke (Zoom aus)', 'Folgen', 'Nah'][o.camera]);
 }
 
@@ -52,7 +63,7 @@ function createRace(cfg) {
     }
   }
   // Zoom-Kamera (nur allein): Szene in doppelter Auflösung, damit sie vergrößert scharf bleibt
-  const rs = cfg.mode !== 'demo' && cfg.players.length === 1 && camZoom() > 1 ? 2 : 1;
+  const rs = sceneRes(cfg.players.length === 1, cfg.mode === 'demo');
   const layers = buildScene(rt.src, rt, { checkpoints: Options.data.showCps && cfg.mode !== 'demo', rs }, wx);
   const skid = document.createElement('canvas'); skid.width = W * rs; skid.height = H * rs;
   const skidCtx = skid.getContext('2d'); skidCtx.setTransform(rs, 0, 0, rs, 0, 0);

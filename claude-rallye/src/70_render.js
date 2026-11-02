@@ -110,7 +110,7 @@ function drawRace(ctx, race) {
   if (cam) {
     // Welt direkt vergrößert zeichnen (Vektorgrafik bleibt scharf, Szene liegt in doppelter Auflösung vor)
     ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip();
-    ctx.setTransform(cam.z, 0, 0, cam.z, -cam.x0 * cam.z, -cam.y0 * cam.z);
+    ctx.setTransform(cam.z * RK, 0, 0, cam.z * RK, -cam.x0 * cam.z * RK, -cam.y0 * cam.z * RK);
   }
   const L = race.layers, wx = race.weather;
   ctx.drawImage(L.scene, 0, 0, W, H);
@@ -143,7 +143,7 @@ function drawRace(ctx, race) {
   if (cam) {
     // Beschriftungen: Schrift nur mäßig mitvergrößern
     const lz = Math.sqrt(cam.z);
-    ctx.setTransform(lz, 0, 0, lz, 0, 0);
+    ctx.setTransform(lz * RK, 0, 0, lz * RK, 0, 0);
     race.camMap = (X, Y) => [((X - cam.x0) * cam.z) / lz, ((Y - cam.y0) * cam.z) / lz];
   } else race.camMap = null;
   const map = (X, Y) => race.camMap ? race.camMap(X, Y) : [X, Y];

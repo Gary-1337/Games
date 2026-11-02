@@ -663,6 +663,7 @@ const Game = {
   },
   render() {
     const ctx = $('game').getContext('2d');
+    ctx.setTransform(RK, 0, 0, RK, 0, 0);
     if (this.state === 'menu') {
       if (this.demo) drawRace(ctx, this.demo);
       ctx.fillStyle = '#0b0f16'; ctx.fillRect(W, 0, PANEL, H);
@@ -681,6 +682,12 @@ function resize() {
   const s = Math.min(window.innerWidth / CW, window.innerHeight / H);
   const st = $('stage');
   st.style.transform = `translate(${(window.innerWidth - CW * s) / 2}px, ${(window.innerHeight - H * s) / 2}px) scale(${s})`;
+  // Zeichenfläche in Bildschirmauflösung (Bühnen-Skalierung × Pixeldichte), sonst wird alles hochskaliert und unscharf
+  const k = clamp(Math.round(s * (window.devicePixelRatio || 1) * 4) / 4, 1, Touch.detect() ? 2 : 3);
+  if (k !== RK) {
+    RK = k; const cv = $('game'); cv.width = Math.round(CW * k); cv.height = Math.round(H * k);
+    const R = Game.race; if (R && Game.state === 'race') cycleCameraRes(R);
+  }
 }
 window.addEventListener('resize', resize);
 

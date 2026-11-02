@@ -4,6 +4,11 @@ Top-Down-Arcade-Rennspiel in einer einzigen Datei (HTML5 + Canvas + JavaScript).
 Die aktuelle Version liegt immer in `index.html`. Die Versionsnummer steht unten rechts im Hauptmenü.
 Unter `versions/` liegen höchstens 3 Versionsstände, ältere werden gelöscht (sie bleiben in der Git-Historie abrufbar). **Rollback:** gewünschte Datei aus `versions/` als `index.html` verwenden. Alle Änderungen sind hier dokumentiert.
 
+## 1.7.1 (02.11.2026)
+- **Schärfere Grafik, vor allem im Zoom:** Die Zeichenfläche wird jetzt in der tatsächlichen Bildschirmauflösung gerendert (Fenstergröße × Pixeldichte, bis 3-fach) statt mit fester Größe hochskaliert. Die Strecke wird passend dazu in bis zu 3-facher Auflösung vorberechnet (vorher fest 2-fach, ohne Zoom 1-fach). Auf Handys und Tablets höchstens 2-fach, damit es flüssig bleibt.
+- Ändert sich die Fenstergröße oder die Zoomstufe (Taste C), wird die Strecke bei Bedarf schärfer neu aufgebaut; auch in Rallye-Etappen beim Abschnittswechsel.
+- Behoben: Nach dem Umschalten des Zooms fehlten die Checkpoint-Fahnen.
+
 ## 1.7.0 (02.11.2026)
 Fertige Version 1.7 mit allen geplanten Punkten (Kommentator, Minikarte und Positionsanzeige aus den Betas 1–3, siehe unten).
 - **Rallye-Etappe (neuer Modus, Hauptmenü):** Punkt-zu-Punkt-Rallye allein gegen die Uhr. 3 Etappen (Wald – Schotter, Schnee – Asphalt mit Eisplatten, Wüste – Sandpisten) mit je 3 bildschirmgroßen Abschnitten.

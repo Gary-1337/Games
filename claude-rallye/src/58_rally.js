@@ -140,6 +140,7 @@ const Rally = {
     const c = this.cur;
     const R = (c.pre && c.pre[c.sec]) || createRace(this.cfg());
     if (c.pre) c.pre[c.sec] = null;
+    cycleCameraRes(R);
     Particles.clear();
     R.state = 'running'; R.cd = 0; R.t = 0; R.goT = 0; R.lastBeep = 0;
     const car = R.cars[0], rt = R.rt, inP = c.stage.sections[c.sec].in, d = edgeDir(inP);
