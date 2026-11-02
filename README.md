@@ -10,7 +10,7 @@ Browserspiele, jeweils eine einzelne HTML-Datei ohne Build-Werkzeuge (außer Cla
 | `treppen-chaos/` | Treppen-Chaos – Ragdoll Dismount (2D) | 1.0.0 |
 | `treppen-chaos-3d/` | Treppen-Chaos 3D | 1.3.0 |
 
-`index.html` im Hauptordner ist die bisherige Startseite aus dem Projekt (derzeit ein älterer Stand von Die Claudler, v2.3.0).
+`index.html` im Hauptordner ist die Startseite mit Links zu allen Spielen.
 
 ## Aufbau je Spiel
 - `index.html` – aktuelle Version
