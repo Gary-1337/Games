@@ -210,6 +210,7 @@ kbd{background:#0f141d;border:1px solid var(--line);border-bottom-width:2px;bord
 #t-pause{top:150px}
 #t-reset{top:250px}
 #t-cp{top:350px}
+#t-item{top:auto;bottom:250px;left:auto;right:18px;display:none}#touch.pu #t-item{display:flex}
 #touch .tsmall.on{background:rgba(255,106,43,.6)}
 #stage,#game{touch-action:none}
 #rotate{display:none}
@@ -244,7 +245,7 @@ kbd{background:#0f141d;border:1px solid var(--line);border-bottom-width:2px;bord
 /* =====================================================================
    1  GRUNDLAGEN
    ===================================================================== */
-const VERSION = '1.7.0-beta2';
+const VERSION = '1.7.0-beta4';
 const W = 1280, H = 800;              // Weltgröße in Pixeln (eine Strecke = ein Bildschirm)
 const PANEL = 260;                    // Breite der Seitenleiste
 const CW = W + PANEL;                 // Canvas-Gesamtbreite
@@ -3312,12 +3313,13 @@ const Input = {
     const k = KEYMAP[p], K = this.keys;
     const T0 = this.taps;
     let up = K.has(k.up), down = K.has(k.down), left = K.has(k.left), right = K.has(k.right), reset = K.has(k.reset) || T0.has(k.reset), cpr = K.has(k.cp) || T0.has(k.cp);
-    T0.delete(k.reset); T0.delete(k.cp);
+    const ik = ITEM_KEYS[p]; let itm = K.has(ik) || T0.has(ik) || (p === 0 && (K.has('ControlRight') || T0.has('ControlRight')));
+    T0.delete(k.reset); T0.delete(k.cp); T0.delete(ik); T0.delete('ControlRight');
     if (p === 0 && this.soloWasd) {
       const w = KEYMAP[1];
-      up = up || K.has(w.up); down = down || K.has(w.down); left = left || K.has(w.left); right = right || K.has(w.right); reset = reset || K.has(w.reset) || T0.has(w.reset); cpr = cpr || K.has(w.cp) || T0.has(w.cp); T0.delete(w.reset); T0.delete(w.cp);
+      up = up || K.has(w.up); down = down || K.has(w.down); left = left || K.has(w.left); right = right || K.has(w.right); reset = reset || K.has(w.reset) || T0.has(w.reset); cpr = cpr || K.has(w.cp) || T0.has(w.cp); itm = itm || K.has('ShiftLeft') || T0.has('ShiftLeft') || K.has('KeyF') || T0.has('KeyF'); T0.delete(w.reset); T0.delete(w.cp); T0.delete('ShiftLeft'); T0.delete('KeyF');
     }
-    if (p === 0 && Touch.active) { const T = Touch.state; up = up || T.up; down = down || T.down; left = left || T.left; right = right || T.right; reset = reset || T.reset; cpr = cpr || T.cp; }
+    if (p === 0 && Touch.active) { const T = Touch.state; up = up || T.up; down = down || T.down; left = left || T.left; right = right || T.right; reset = reset || T.reset; cpr = cpr || T.cp; itm = itm || T.item; }
     let thr = up ? 1 : 0, brk = down ? 1 : 0, steer = (right ? 1 : 0) - (left ? 1 : 0);
     let pause = false;
     const pad = this.pads()[p];
@@ -3333,12 +3335,13 @@ const Input = {
       if (Math.abs(ax) > 0.5) { if (ax < 0) left = true; else right = true; }
       if (pr(3)) reset = true;
       if (pr(2)) cpr = true;
+      if (pr(5) || pr(4)) itm = true;
       if (pr(9) && !this.padPrevPause[p]) pause = true;
       this.padPrevPause[p] = pr(9);
     }
     const pv = this.prev[p];
-    const edge = { left: left && !pv.left, right: right && !pv.right, down: down && !pv.down, reset: reset && !pv.reset, cp: cpr && !pv.cpr };
-    this.prev[p] = { left, right, down, reset, cpr };
+    const edge = { left: left && !pv.left, right: right && !pv.right, down: down && !pv.down, reset: reset && !pv.reset, cp: cpr && !pv.cpr, item: itm && !pv.itm };
+    this.prev[p] = { left, right, down, reset, cpr, itm };
     return { thr, brk, steer, edge, pause };
   }
 };
@@ -3540,7 +3543,7 @@ const Music = {
    ===================================================================== */
 const Speaker = {
   last: {}, voice: null, busyT: 0,
-  ok() { return typeof speechSynthesis !== 'undefined' && Options.data.commentary !== false && Options.data.sound; },
+  ok() { return typeof speechSynthesis !== 'undefined' && Options.data.commentary === true && Options.data.sound; },
   /** Deutsche Stimmen, männliche und natürliche zuerst. */
   voices() {
     if (typeof speechSynthesis === 'undefined') return [];
@@ -3584,7 +3587,7 @@ if (typeof speechSynthesis !== 'undefined') try { speechSynthesis.onvoiceschange
    Oben links: Pause, darunter Reset. Nur für Spieler 1.
    ===================================================================== */
 const Touch = {
-  active: false, el: null, state: { up: false, down: false, left: false, right: false, reset: false, cp: false }, ptr: new Map(),
+  active: false, el: null, state: { up: false, down: false, left: false, right: false, reset: false, cp: false, item: false }, ptr: new Map(),
   /** Touch-Gerät erkannt? */
   detect() { try { return (navigator.maxTouchPoints || 0) > 0 || matchMedia('(pointer: coarse)').matches; } catch (e) { return false; } },
   /** Einstellung: 0 = automatisch, 1 = immer an, 2 = aus */
@@ -3593,7 +3596,7 @@ const Touch = {
     const el = document.createElement('div'); el.id = 'touch';
     el.innerHTML = `<div class="tz" id="tz-steer"><div class="tb" data-k="left">◀</div><div class="tb" data-k="right">▶</div></div>
       <div class="tz" id="tz-pedal"><div class="tb" data-k="down">BREMSE<small>Box: Tanken</small></div><div class="tb gas" data-k="up">GAS</div></div>
-      <div class="tsmall" id="t-pause">Ⅱ</div><div class="tsmall" id="t-reset">↺</div><div class="tsmall" id="t-cp">⚑</div>`;
+      <div class="tsmall" id="t-pause">Ⅱ</div><div class="tsmall" id="t-reset">↺</div><div class="tsmall" id="t-cp">⚑</div><div class="tsmall" id="t-item">⚡</div>`;
     $('stage').appendChild(el); this.el = el;
     // Zonen: welcher Knopf liegt unter dem Finger? (Finger dürfen zwischen Knöpfen gleiten)
     const zoneKey = (zone, e) => {
@@ -3611,6 +3614,9 @@ const Touch = {
     const cpb = $('t-cp');
     cpb.addEventListener('pointerdown', e => { e.preventDefault(); this.state.cp = true; cpb.classList.add('on'); });
     for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) cpb.addEventListener(ev, () => { this.state.cp = false; cpb.classList.remove('on'); });
+    const itb = $('t-item');
+    itb.addEventListener('pointerdown', e => { e.preventDefault(); this.state.item = true; itb.classList.add('on'); });
+    for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) itb.addEventListener(ev, () => { this.state.item = false; itb.classList.remove('on'); });
     const rs = $('t-reset');
     rs.addEventListener('pointerdown', e => { e.preventDefault(); this.state.reset = true; rs.classList.add('on'); });
     for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) rs.addEventListener(ev, () => { this.state.reset = false; rs.classList.remove('on'); });
@@ -3625,7 +3631,7 @@ const Touch = {
     if (!this.el) return;
     const show = this.enabled() && Game.state === 'race' && !!Game.race && Game.race.cars.some(c => c.human === 0) && !Game.paused;
     if (show !== this.active) {
-      this.active = show; this.el.classList.toggle('on', show);
+      this.active = show; this.el.classList.toggle('on', show); this.el.classList.toggle('pu', show && !!Game.race.powerups);
       if (!show) { this.ptr.clear(); this.sync(); this.state.reset = false; }
     }
   }
@@ -3683,6 +3689,7 @@ function makeCar(o) {
   };
 }
 const carSpeed = c => Math.hypot(c.vx, c.vy);
+const onPitSurf = s => s === S.PIT;
 const fwdSpeed = c => c.vx * Math.cos(c.a) + c.vy * Math.sin(c.a);
 
 /** Ebene aktualisieren: Auf eine Brücke kommt man nur über ein Ende und auf Deckhöhe. */
@@ -3734,10 +3741,13 @@ function stepCarPhysics(car, inp, dt, race) {
   let puddle = false;
   if (rt.puddles && car.level === 0) for (const p of rt.puddles) if ((car.x - p.x) ** 2 + (car.y - p.y) ** 2 < p.r * p.r) { puddle = true; break; }
   if (puddle) gripMul *= 0.6;
+  if (car.oilT > 0) gripMul *= 0.28;
   car.puddle = puddle;
   const fuelF = (rules.fuelOn && car.fuel <= 0) ? 0.22 : 1;
   let maxV = cls.maxSpeed * speedFactor(cls, surf) * (1 - 0.35 * d) * (1 + 0.07 * (car.draft || 0));
   const onPit = surf === S.PIT;
+  const boost = car.boostT > 0 && !onPitSurf(surf) ? 1 : 0;
+  if (boost) maxV *= 1.28;
   if (onPit) maxV = Math.min(maxV, PIT_LIMIT);
   const thr = inp.thr, brk = inp.brk, steer = inp.steer;
   car.thr = thr; car.brk = brk;
@@ -3772,6 +3782,7 @@ function stepCarPhysics(car, inp, dt, race) {
     if (thr > 0) {
       if (vF < -5) acc += cls.brake * thr;
       else { const ratio = Math.max(0, vF) / maxV; acc += cls.accel * (1 - 0.35 * d) * fuelF * thr * Math.max(0, 1 - ratio * ratio) * traction * (1 + 0.25 * (car.draft || 0)); }
+      if (boost && vF > -5) acc += cls.accel * 0.9 * traction;
     }
     if (brk > 0) {
       if (vF > 15) acc -= cls.brake * brk * Math.min(1, 0.35 + gripMul * 0.8);
@@ -3845,6 +3856,7 @@ function stepCarPhysics(car, inp, dt, race) {
 /** Aufprall-Folgen: Schaden, Funken, Sound. */
 function onImpact(car, imp, x, y, race, factor = 1) {
   if (imp < 30) return;
+  if (car.shieldT > 0) factor *= 0.15;
   const rules = race.rules;
   if (rules.dmgOn && imp > 45 && !car.finished) car.damage = Math.min(100, car.damage + (imp - 45) * 0.085 * factor * car.cls.dmgMul * rules.dmgPct / 100);
   if (car.human >= 0 && imp > 260 && race.audible) Speaker.say(['Autsch!', 'Das hat gekracht!', 'Das gibt Beulen!'][Math.floor(Math.random() * 3)], 'crash', 9);
@@ -4243,6 +4255,207 @@ function updateService(car, dt, race) {
   return true;
 }
 /* =====================================================================
+   10b  POWER-UPS (Arcade-Regel): Nitro-Pads, Item-Kisten, Nitro / Öl / Schild
+   ===================================================================== */
+const ITEMS = {
+  nitro: { name: 'Nitro', ico: '⚡', col: '#38c4ff' },
+  oil: { name: 'Öl', ico: '◉', col: '#c08cff' },
+  shield: { name: 'Schild', ico: '◆', col: '#46d68a' }
+};
+const ITEM_KEYS = ['ShiftRight', 'KeyF', 'KeyH', 'Numpad0'];
+const ITEM_LABELS = ['Shift rechts', 'F', 'H', 'Num 0'];
+const BOOST_T = { pad: 0.9, nitro: 1.7 };
+
+const PU = {
+  /** Pads und Kisten auf der Strecke verteilen (abhängig von der Streckenform, immer gleich je Strecke). */
+  setup(race) {
+    const rt = race.rt, n = rt.n;
+    race.pads = []; race.boxes = []; race.slicks = [];
+    // Krümmung je Linienpunkt (Richtungsänderung über ±8 Punkte)
+    const curv = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const a = (i - 8 + n) % n, b = (i + 8) % n;
+      curv[i] = Math.abs(wrapAngle(Math.atan2(rt.ty[b], rt.tx[b]) - Math.atan2(rt.ty[a], rt.tx[a])));
+    }
+    const sOf = i => rt.cum[i];
+    const okAt = i => !rt.lvl[i] && sOf(i) > 90 && sOf(i) < rt.L - 40 && cellAt(rt.src, rt.lx[i], rt.ly[i]) !== S.PIT &&
+      !(rt.pit && inBoxRect(rt.pit.box, rt.lx[i], rt.ly[i], 20));
+    const far = (list, i, min) => list.every(o => { const d = Math.abs(sOf(o.i) - sOf(i)); return Math.min(d, rt.L - d) > min; });
+    // Nitro-Pads: auf den geradesten Stellen
+    const order = [...Array(n).keys()].filter(okAt).sort((p, q) => curv[p] - curv[q]);
+    const nPads = clamp(Math.round(rt.L / 900), 2, 3);
+    for (const i of order) {
+      if (race.pads.length >= nPads) break;
+      if (curv[i] > 0.35 || !far(race.pads, i, rt.L / (nPads + 1))) continue;
+      race.pads.push({ i, x: rt.lx[i], y: rt.ly[i], a: Math.atan2(rt.ty[i], rt.tx[i]), cool: new Map() });
+    }
+    // Kistenreihen: quer über die Fahrbahn, mit Abstand zu den Pads
+    const nRows = clamp(Math.round(rt.L / 1100), 2, 3);
+    const rows = [];
+    for (let k = 0; k < nRows; k++) {
+      const target = rt.L * (k + 0.5) / nRows;
+      let best = -1, bd = Infinity;
+      for (const i of order) {
+        if (curv[i] > 0.6) continue;
+        const d = Math.abs(sOf(i) - target);
+        if (d < bd && far(race.pads, i, 140) && far(rows, i, 260)) { bd = d; best = i; }
+      }
+      if (best < 0) continue;
+      rows.push({ i: best });
+      const i = best, rx = -rt.ty[i], ry = rt.tx[i];
+      for (const off of [-Math.min(16, rt.wl[i]), 0, Math.min(16, rt.wr[i])]) {
+        const x = rt.lx[i] + rx * off, y = rt.ly[i] + ry * off;
+        if (SURF[cellAt(rt.src, x, y)].oob) continue;
+        race.boxes.push({ x, y, t: 0, spin: Math.random() * 6 });
+      }
+    }
+  },
+
+  zAt(race, x, y) { return terrainH(race.rt, x, y); },
+
+  give(car, race) {
+    const pool = ['nitro', 'nitro', 'oil', 'shield'];
+    // Hinten liegende bekommen öfter Nitro
+    if (car.place > race.cars.length / 2) pool.push('nitro', 'shield');
+    car.item = pool[Math.floor(Math.random() * pool.length)];
+    car.itemCd = car.ai ? 0.6 + Math.random() * 1.2 : 0;
+    if (car.human >= 0) { flashMsg(car, ITEMS[car.item].name.toUpperCase() + ' eingesammelt', ITEMS[car.item].col); if (race.audible) Sound.beep(980, 0.08, 'triangle', 0.1); }
+  },
+
+  use(car, race) {
+    const it = car.item; if (!it) return;
+    car.item = null;
+    if (it === 'nitro') { car.boostT = BOOST_T.nitro; if (race.audible && car.human >= 0) Sound.beep(220, 0.25, 'sawtooth', 0.08); }
+    else if (it === 'shield') car.shieldT = 6;
+    else if (it === 'oil') {
+      const bx = car.x - Math.cos(car.a) * 16, by = car.y - Math.sin(car.a) * 16;
+      race.slicks.push({ x: bx, y: by, r: 15, life: 22, owner: car.id, grace: 0.8, a: Math.random() * 3 });
+      if (race.slicks.length > 12) race.slicks.shift();
+      if (race.audible && car.human >= 0) Sound.beep(160, 0.15, 'square', 0.07);
+    }
+    if (car.human < 0 && race.audible && race.mode !== 'demo' && Math.random() < 0.3) {
+      if (it === 'oil') Speaker.say(car.name + ' lässt Öl ab!', 'oil', 12);
+    }
+  },
+
+  /** KI: wann ein Item benutzen. */
+  aiUse(car, race, dt) {
+    if (!car.item || car.finished) return;
+    if (car.itemCd > 0) { car.itemCd -= dt; return; }
+    const rt = race.rt, it = car.item;
+    if (it === 'nitro') {
+      // auf einer Geraden ohne Kurve in den nächsten ~25 Punkten
+      const prof = speedProfile(rt, car.cls); let minV = Infinity;
+      for (let k = 2; k < 28; k++) minV = Math.min(minV, prof[(car.idx + k) % rt.n]);
+      if (minV > car.cls.maxSpeed * 0.82 && fwdSpeed(car) > 60) this.use(car, race);
+    } else if (it === 'oil') {
+      const behind = race.cars.some(c => c !== car && !c.finished && dist(c.x, c.y, car.x, car.y) < 70 && ((car.x - c.x) * Math.cos(car.a) + (car.y - c.y) * Math.sin(car.a)) > 10);
+      if (behind) this.use(car, race);
+    } else if (it === 'shield') {
+      const danger = race.slicks.some(s => s.owner !== car.id && dist(s.x, s.y, car.x + car.vx * 0.5, car.y + car.vy * 0.5) < 40) ||
+        race.cars.some(c => c !== car && dist(c.x, c.y, car.x, car.y) < 26);
+      if (danger) this.use(car, race);
+    }
+  },
+
+  update(race, dt) {
+    const running = race.state === 'running' || race.state === 'ending';
+    for (const b of race.boxes) if (b.t > 0) b.t -= dt;
+    for (const s of race.slicks) { s.life -= dt; if (s.grace > 0) s.grace -= dt; }
+    race.slicks = race.slicks.filter(s => s.life > 0);
+    for (const car of race.cars) {
+      if (car.boostT > 0) {
+        car.boostT -= dt;
+        if (!car.air && Math.random() < dt * 40) Particles.add('puff', car.x - Math.cos(car.a) * 9, car.y - Math.sin(car.a) * 9, car.z + 3, -car.vx * 0.2 + (Math.random() - 0.5) * 20, -car.vy * 0.2 + (Math.random() - 0.5) * 20, 0, 0.35, 3, '120,200,255', 0, 2);
+      }
+      if (car.shieldT > 0) car.shieldT -= dt;
+      if (car.oilT > 0) car.oilT -= dt;
+      if (!running || car.finished || car.sink > 0 || car.air || car.level === 1) continue;
+      // Item benutzen
+      if (car.human < 0 && car.ai) this.aiUse(car, race, dt);
+      // Nitro-Pads
+      for (const p of race.pads) {
+        const lx = (car.x - p.x) * Math.cos(p.a) + (car.y - p.y) * Math.sin(p.a), ly = -(car.x - p.x) * Math.sin(p.a) + (car.y - p.y) * Math.cos(p.a);
+        if (Math.abs(lx) < 14 && Math.abs(ly) < 13 && (p.cool.get(car.id) || 0) < race.t) {
+          p.cool.set(car.id, race.t + 1.5);
+          car.boostT = Math.max(car.boostT || 0, BOOST_T.pad);
+          if (car.human >= 0 && race.audible) Sound.beep(660, 0.12, 'sawtooth', 0.07);
+        }
+      }
+      // Kisten
+      if (!car.item) for (const b of race.boxes) {
+        if (b.t > 0 || (car.x - b.x) ** 2 + (car.y - b.y) ** 2 > 12 * 12) continue;
+        b.t = 4; this.give(car, race);
+        Particles.sparks(b.x, b.y, 6, this.zAt(race, b.x, b.y) + 4);
+        break;
+      }
+      // Ölflecken
+      for (const s of race.slicks) {
+        if ((s.owner === car.id && s.grace > 0) || (car.x - s.x) ** 2 + (car.y - s.y) ** 2 > s.r * s.r) continue;
+        if (car.shieldT > 0) continue;
+        if (!(car.oilT > 0)) {
+          car.av += (Math.random() < 0.5 ? -1 : 1) * (2.2 + Math.random() * 1.5);
+          if (car.human >= 0) { flashMsg(car, 'ÖL!', '#c08cff'); if (race.audible) Speaker.say('Ins Öl gerutscht!', 'oilhit', 10); }
+        }
+        car.oilT = 0.9;
+      }
+    }
+  },
+
+  /** Am Boden liegende Elemente (vor den Autos zeichnen). */
+  drawGround(ctx, race) {
+    const t = race.time;
+    for (const p of race.pads) {
+      const z = this.zAt(race, p.x, p.y) + 0.5, ca = Math.cos(p.a), sa = Math.sin(p.a);
+      const pt = (lx, ly) => P(p.x + ca * lx - sa * ly, p.y + sa * lx + ca * ly, z);
+      ctx.fillStyle = 'rgba(10,30,60,.75)'; ctx.beginPath();
+      for (const [lx, ly] of [[-14, -12], [14, -12], [14, 12], [-14, 12]]) { const q = pt(lx, ly); ctx.lineTo(q[0], q[1]); }
+      ctx.closePath(); ctx.fill();
+      for (let k = 0; k < 3; k++) {
+        const ph = (t * 2.5 - k * 0.33) % 1, a = 0.35 + 0.65 * (1 - Math.abs(ph - 0.5) * 2);
+        ctx.strokeStyle = `rgba(80,200,255,${a})`; ctx.lineWidth = 2.5; ctx.beginPath();
+        const ox = -8 + k * 8;
+        for (const [lx, ly] of [[ox - 4, -8], [ox + 4, 0], [ox - 4, 8]]) { const q = pt(lx, ly); ctx.lineTo(q[0], q[1]); }
+        ctx.stroke();
+      }
+    }
+    for (const s of race.slicks) {
+      const z = this.zAt(race, s.x, s.y) + 0.4, [x, y] = P(s.x, s.y, z), f = Math.min(1, s.life / 3);
+      ctx.save(); ctx.globalAlpha = 0.85 * f; ctx.translate(x, y); ctx.rotate(s.a);
+      ctx.fillStyle = '#14101c'; ctx.beginPath(); ctx.ellipse(0, 0, s.r, s.r * 0.72, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(150,110,220,.35)'; ctx.beginPath(); ctx.ellipse(-s.r * 0.3, -s.r * 0.2, s.r * 0.35, s.r * 0.18, 0.4, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+  },
+
+  /** Kisten (stehen auf der Fahrbahn) */
+  drawBoxes(ctx, race) {
+    const t = race.time;
+    for (const b of race.boxes) {
+      if (b.t > 0) continue;
+      const z = this.zAt(race, b.x, b.y) + 3 + Math.sin(t * 3 + b.spin) * 1.5;
+      const [x, y] = P(b.x, b.y, z), [sx, sy] = P(b.x, b.y, z - 3);
+      ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(sx, sy + 2, 6, 3, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.save(); ctx.translate(x, y - 4); ctx.rotate(Math.sin(t * 2 + b.spin) * 0.3);
+      ctx.fillStyle = '#ffb02e'; rr(ctx, -6, -6, 12, 12, 2); ctx.fill();
+      ctx.strokeStyle = '#7a4a00'; ctx.lineWidth = 1.2; ctx.stroke();
+      ctx.fillStyle = '#3a2200'; ctx.font = '700 10px "Chakra Petch",sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('?', 0, 0.5);
+      ctx.restore();
+    }
+  },
+
+  /** Schild und Boost am Auto (nach dem Auto zeichnen). */
+  drawCarFx(ctx, race) {
+    for (const c of race.cars) {
+      if (c.shieldT > 0) {
+        const [x, y] = P(c.x, c.y, c.z + 5), blink = c.shieldT < 1.5 ? 0.5 + 0.5 * Math.sin(race.time * 20) : 1;
+        ctx.strokeStyle = `rgba(70,214,138,${0.8 * blink})`; ctx.fillStyle = `rgba(70,214,138,${0.15 * blink})`; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.ellipse(x, y, 17, 13, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      }
+    }
+  }
+};
+/* =====================================================================
    11  RENNEN: Countdown, Checkpoints, Positionen, Boxendienst, Ziel, Rekorde, Ghost
    ===================================================================== */
 let race = null;
@@ -4356,6 +4569,10 @@ function createRace(cfg) {
   R.outCount = 0;
   // Ghost laden (nur Zeitfahren)
   if (cfg.mode === 'trial') R.ghost = store.get('cr_ghost_' + src.id, null);
+  // Power-ups: nur als Regel in Rennen/Ausscheidung/Championship, nie in der Karriere
+  R.powerups = !!R.rules.powerups && !R.career && ['quick', 'elim', 'champ', 'test'].includes(cfg.mode);
+  R.pads = []; R.boxes = []; R.slicks = [];
+  if (R.powerups) PU.setup(R);
   Particles.clear();
   return R;
 }
@@ -4507,6 +4724,7 @@ function updateRace(race, dt) {
       if (inp.pause && race.mode !== 'demo') Game.pause();
       if (inp.edge.reset && running) { resetCar(car, race); if (race.mode === 'derby') car.damage = Math.min(99, car.damage + 8); }
       else if (inp.edge.cp && running) { resetToCheckpoint(car, race); if (race.mode === 'derby') car.damage = Math.min(99, car.damage + 8); }
+      if (inp.edge.item && running && race.powerups) PU.use(car, race);
     } else if (car.ai) inp = aiControl(car, race, dt);
     if (!running) { car.thr = inp.thr; inp = { thr: 0, brk: 0, steer: 0, edge: {} }; }
 
@@ -4520,6 +4738,7 @@ function updateRace(race, dt) {
     if (updateService(car, dt, race)) { car.prevX = car.x; car.prevY = car.y; car.thr = 0; continue; }
     stepCarPhysics(car, inp, dt, race);
   }
+  if (race.powerups) PU.update(race, dt);
   for (const car of race.cars) if (car.sink <= 0) collideObjects(car, race);
   collideCars(race.cars, race);
 
@@ -4875,6 +5094,7 @@ function drawRace(ctx, race) {
   const L = race.layers, wx = race.weather;
   ctx.drawImage(L.scene, 0, 0, W, H);
   ctx.drawImage(race.skid, 0, 0, W, H);
+  if (race.powerups) PU.drawGround(ctx, race);
   // Autos + dynamische Objekte (Brücken, Tribünen, Flaggen) nach Tiefe
   const bridges = L.dyn.filter(o => o.t === 'bridge');
   const items = race.cars.map(c => { const v = carView(c, race); return { k: viewKey(v, bridges), car: v }; });
@@ -4894,6 +5114,7 @@ function drawRace(ctx, race) {
     }
   }
   ZB = 0;
+  if (race.powerups) { PU.drawBoxes(ctx, race); PU.drawCarFx(ctx, race); }
   Particles.draw(ctx);
   drawWeather(ctx, race);
   ctx.drawImage(L.overlay, 0, 0);
@@ -5113,6 +5334,14 @@ function drawPlayerCard(ctx, c, race, x, y, w, h) {
   ctx.fillText('P' + (c.human + 1) + '  ' + c.name.slice(0, 12), x + 12, y + 19);
   ctx.textAlign = 'right';
   if (race.mode !== 'trial') { ctx.font = '400 22px "Russo One",sans-serif'; ctx.fillStyle = c.place === 1 ? '#ffd23e' : '#fff'; ctx.fillText(c.place + '.', x + w - 10, y + 23); }
+  if (race.powerups) {
+    const it = c.item && ITEMS[c.item], bx = x + w - 66, by = y + 6;
+    ctx.fillStyle = it ? it.col : '#0d1219'; rr(ctx, bx, by, 22, 22, 5); ctx.fill();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '700 13px "Chakra Petch",sans-serif'; ctx.fillStyle = it ? '#0d1219' : '#3a4558';
+    ctx.fillText(it ? it.ico : '·', bx + 11, by + 12);
+    if (c.boostT > 0) { ctx.fillStyle = '#38c4ff'; ctx.fillRect(bx - 26, by + 9, 20 * clamp(c.boostT / BOOST_T.nitro, 0, 1), 4); }
+    ctx.textAlign = 'right'; ctx.textBaseline = 'alphabetic';
+  }
   ctx.textAlign = 'left'; ctx.font = '500 11px "Chakra Petch",sans-serif'; ctx.fillStyle = '#8a97ad';
   if (race.mode === 'derby') {
     ctx.fillText(c.wreck ? 'Wrack – ausgeschieden' : c.finished ? 'Letztes fahrbereites Auto!' : 'Rammen mit der Front schont dein Auto', x + 12, y + 33);
@@ -5231,13 +5460,13 @@ function resolveWeather(wi, ti) {
 const WX_LABEL = wx => ({ clear: 'Klar', cloudy: 'Bewölkt', rain: wx.snow ? 'Schneefall' : 'Regen' }[wx.sky] + ' · ' + { day: 'Tag', dusk: 'Abend', night: 'Nacht' }[wx.time]);
 const QMODES = [['quick', 'Rennen'], ['elim', 'Ausscheidung'], ['derby', 'Derby']];
 const DERBY_TIMES = [120, 180, 300];
-const DEFAULT_RULES = { fuelOn: true, fuelPct: 100, tireOn: true, tirePct: 100, dmgOn: true, dmgPct: 100, pits: true };
+const DEFAULT_RULES = { fuelOn: true, fuelPct: 100, tireOn: true, tirePct: 100, dmgOn: true, dmgPct: 100, pits: true, powerups: false };
 const Options = {
   data: null,
   defaults() {
     return {
       names: ['Spieler 1', 'Spieler 2', 'Spieler 3', 'Spieler 4'], volume: 70, sound: true, engine: true, showCps: false,
-      music: true, musicVol: 55, raceMusic: true, aiEngines: true, touch: 0, camera: 1, commentary: true,
+      music: true, musicVol: 55, raceMusic: true, aiEngines: true, touch: 0, camera: 1, commentary: false,
       setup: {
         trackId: 'oval', laps: 5, ai: 5, diff: 2, aiCls: -1, humans: 1, weather: 0, time: 0, qmode: 0, derbyTrack: 'arena_mud', derbyTime: 1,
         players: [{ cls: 1, color: 0 }, { cls: 1, color: 1 }, { cls: 1, color: 2 }, { cls: 1, color: 3 }],
@@ -5249,6 +5478,8 @@ const Options = {
   load() {
     const d = this.defaults(), s = store.get('cr_options', {});
     this.data = { ...d, ...s, setup: { ...d.setup, ...(s.setup || {}) } };
+    // 1.7.0-beta3: Kommentator standardmäßig aus (auch bei bestehenden Einstellungen einmalig ausschalten)
+    if (!s.commV) { this.data.commentary = false; this.data.commV = 1; }
     this.data.setup.rules = { ...DEFAULT_RULES, ...this.data.setup.rules };
     this.data.setup.trialRules = { ...d.setup.trialRules, ...this.data.setup.trialRules };
     if (!Array.isArray(this.data.names) || this.data.names.length < 4) this.data.names = d.names;
@@ -5370,6 +5601,7 @@ const UI = {
     raceCol += ruleRow('Reifenverschleiß', rules.tireOn, 'tirePct', 'tireOn');
     raceCol += ruleRow('Schadensmodell', rules.dmgOn, 'dmgPct', 'dmgOn');
     raceCol += `<div class="row"><label class="l">Boxenstopps</label>${tog('rule', rules.pits).replace('data-act="rule"', 'data-act="rule" data-v="pits"')}</div>`;
+    if (!trial) raceCol += `<div class="row"><label class="l">Power-ups</label>${tog('rule', !!rules.powerups).replace('data-act="rule"', 'data-act="rule" data-v="powerups"')}<span class="note">Nitro-Pads und ?-Kisten (Nitro, Öl, Schild)</span></div>`;
     raceCol += `<div class="note" style="margin-top:14px;line-height:1.5">Boxenstopp: in den gelben Boxenbereich fahren, anhalten, dann<br><b>Links</b> = Reparatur · <b>Unten</b> = Tanken · <b>Rechts</b> = Reifen.<br>In der Boxengasse gilt ein Tempolimit.</div>`;
     }
 
@@ -5379,7 +5611,7 @@ const UI = {
       const p = st.players[i];
       plCol += `<div class="prow"><div class="top"><span class="badge" style="background:${COLORS[p.color]}">P${i + 1}</span>
         <input class="name" data-act="name" data-v="${i}" value="${escapeHtml(names[i])}" maxlength="14">
-        <span class="keys">${humans === 1 && i === 0 ? 'Pfeiltasten oder WASD · Reset R · Checkpoint Leertaste' : KEYMAP[i].label + ' · Reset ' + KEYMAP[i].resetLabel + ' · Checkpoint ' + KEYMAP[i].cpLabel}</span></div>
+        <span class="keys">${humans === 1 && i === 0 ? 'Pfeiltasten oder WASD · Reset R · Checkpoint Leertaste' + (rules.powerups ? ' · Item Shift' : '') : KEYMAP[i].label + ' · Reset ' + KEYMAP[i].resetLabel + ' · Checkpoint ' + KEYMAP[i].cpLabel + (rules.powerups ? ' · Item ' + ITEM_LABELS[i] : '')}</span></div>
         <div class="row" style="margin:4px 0">${seg('cls' + i, CLASSES.map(c => c.name), p.cls).replace('class="seg"', 'class="seg small"')}</div>
         <div class="clsdesc">${CLASSES[p.cls].desc}</div>
         <div class="swatches" style="margin-top:8px">${COLORS.map((c, k) => `<span class="sw ${k === p.color ? 'on' : ''}" style="background:${c}" data-act="color${i}" data-v="${k}"></span>`).join('')}</div></div>`;
@@ -5503,7 +5735,7 @@ const UI = {
           <div class="row"><label class="l">Lautstärke</label><input type="range" min="0" max="100" value="${o.volume}" data-act="ovol"><span class="pct">${o.volume}%</span></div>
           <div class="row"><label class="l">Motorgeräusch</label>${tog('oengine', o.engine)}</div>
           <div class="row"><label class="l">KI-Motoren hörbar</label>${tog('oaieng', o.aiEngines !== false)}</div>
-          <div class="row"><label class="l">Kommentator</label>${tog('ocomm', o.commentary !== false)}</div>
+          <div class="row"><label class="l">Kommentator</label>${tog('ocomm', o.commentary === true)}</div>
           <div class="row"><label class="l">Stimme</label><select data-act="ovoice" class="selbox" style="max-width:210px">${(() => { const vl = Speaker.voices(); const cur = Speaker.pickVoice(); return vl.length ? vl.map(x => `<option value="${escapeHtml(x.v.name)}" ${cur && cur.name === x.v.name ? 'selected' : ''}>${escapeHtml(x.v.name.replace(/^Microsoft |^Google /, '').slice(0, 34))}${x.male ? ' ♂' : x.female ? ' ♀' : ''}</option>`).join('') : '<option>keine deutsche Stimme gefunden</option>'; })()}</select>
             <button class="btn small" data-act="ovtest">▶</button></div>
           <div class="row"><label class="l">Musik</label>${tog('omusic', o.music)}</div>
@@ -5537,9 +5769,9 @@ const UI = {
     else if (act === 'oracemus') o.raceMusic = !o.raceMusic;
     else if (act === 'otouch') o.touch = +v;
     else if (act === 'ocam') o.camera = +v;
-    else if (act === 'ovoice') { o.voiceName = el.value; Speaker.voice = null; Options.save(); Speaker.say('Hallo, ich bin dein Kommentator. Und los geht\'s!', 'test', 0, 2); return; }
-    else if (act === 'ovtest') { Speaker.say('Und da ist er! Neuer Streckenrekord! Was für eine Runde!', 'test', 0, 2); return; }
-    else if (act === 'ocomm') { o.commentary = o.commentary === false; if (o.commentary) { Options.save(); Speaker.say('Kommentator ist an.', 'test', 1, 2); } else Speaker.stop(); }
+    else if (act === 'ovoice') { o.voiceName = el.value; Speaker.voice = null; Options.save(); const was = o.commentary; o.commentary = true; Speaker.say('Hallo, ich bin dein Kommentator. Und los geht\'s!', 'test', 0, 2); o.commentary = was; return; }
+    else if (act === 'ovtest') { const was = o.commentary; o.commentary = true; Speaker.say('Und da ist er! Neuer Streckenrekord! Was für eine Runde!', 'test', 0, 2); o.commentary = was; return; }
+    else if (act === 'ocomm') { o.commentary = o.commentary !== true; if (o.commentary) { Options.save(); Speaker.say('Kommentator ist an.', 'test', 1, 2); } else Speaker.stop(); }
     else if (act === 'omvol') { o.musicVol = +el.value; el.nextElementSibling.textContent = el.value + '%'; Sound.applyVolume(); Options.save(); return; }
     else if (act === 'ovol') { o.volume = +el.value; el.nextElementSibling.textContent = el.value + '%'; Sound.applyVolume(); return; }
     else if (act === 'oclear') {

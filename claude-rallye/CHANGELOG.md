@@ -2,9 +2,16 @@
 
 Top-Down-Arcade-Rennspiel in einer einzigen Datei (HTML5 + Canvas + JavaScript).
 Die aktuelle Version liegt immer in `index.html`. Die Versionsnummer steht unten rechts im Hauptmenü.
-Im Projekt werden höchstens 3 Versionsstände aufbewahrt (aktuelle `index.html` + bis zu 2 ältere unter `versions/`). Ältere werden gelöscht. **Rollback:** gewünschte Datei aus `versions/` als `index.html` verwenden. Alle Änderungen sind hier dokumentiert.
+Unter `versions/` liegen höchstens 3 Versionsstände, ältere werden gelöscht (sie bleiben in der Git-Historie abrufbar). **Rollback:** gewünschte Datei aus `versions/` als `index.html` verwenden. Alle Änderungen sind hier dokumentiert.
 
-## 1.7.0-beta4 (02.11.2026, in Arbeit)
+## 1.7.0 (02.11.2026)
+Fertige Version 1.7 mit allen geplanten Punkten (Kommentator, Minikarte und Positionsanzeige aus den Betas 1–3, siehe unten).
+- **Rallye-Etappe (neuer Modus, Hauptmenü):** Punkt-zu-Punkt-Rallye allein gegen die Uhr. 3 Etappen (Wald – Schotter, Schnee – Asphalt mit Eisplatten, Wüste – Sandpisten) mit je 3 bildschirmgroßen Abschnitten.
+  - Am Bildrand geht es nahtlos mit gleichem Tempo in den nächsten Abschnitt, vorher müssen alle Checkpoints durchfahren sein. Schaden bleibt über die ganze Etappe.
+  - Seitenleiste: Gesamtzeit, Abschnittszeit, Bestzeit und Zwischenzeit zur Bestzeit. Ergebnis mit Abschnittszeiten und Bestenliste (Top 10) je Etappe.
+  - Auswahl mit Vorschau aller Abschnitte, Auto (3D-Drehansicht), Farbe und Wetter. Die Abschnitte werden beim Start vorab aufgebaut, damit der Wechsel nicht ruckelt.
+- Hauptmenü etwas kompakter (Platz für den neuen Eintrag). Minikarte bleibt im Rahmen.
+- Neuer Test `tests/rally.py`.
 - **Power-ups (Arcade-Regel):** im Setup unter Regeln „Power-ups“ einschaltbar (Standard aus; im Zeitfahren, Derby und in der Karriere nie).
   - Nitro-Pads (blaue Pfeilfelder) auf den Geraden: kurzer Schub.
   - ?-Kisten in Reihen quer über die Fahrbahn, nach 4 s wieder da. Inhalt zufällig: **Nitro** (längerer Schub), **Öl** (Fleck hinter dem Auto, wer hineinfährt, rutscht), **Schild** (6 s: schützt vor Öl und dämpft Schaden). Hinten liegende Fahrer bekommen öfter Nitro und Schild.

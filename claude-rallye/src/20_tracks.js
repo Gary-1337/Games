@@ -308,7 +308,9 @@ function generateTrack(def) {
     const a = tg[(i - K + n) % n], b = tg[(i + K) % n];
     curv[i] = Math.atan2(a.x * b.y - a.y * b.x, a.x * b.x + a.y * b.y) / (2 * K * 4);
   }
-  const preWater = center.map(p => !!SURF[cellAt(t, p.x, p.y)].oob);
+  // Punkt-zu-Punkt-Abschnitte: Der Rückweg der (geschlossenen) Linie verläuft außerhalb der Karte und zählt nicht als Wasser
+  const inWorld = p => p.x >= 0 && p.y >= 0 && p.x <= W && p.y <= H;
+  const preWater = center.map(p => (!def.p2p || inWorld(p)) && !!SURF[cellAt(t, p.x, p.y)].oob);
   const bridges = findBridges(t, def, center, tg, hw, preWater);
   const onBridge = (x, y, m) => bridges.some(b => { const [lx, ly] = localOf(b, x, y); return Math.abs(lx) <= b.w / 2 + m && Math.abs(ly) <= b.h / 2 + m; });
   const baseOnly = new Set([def.base]);
@@ -410,6 +412,8 @@ function generateTrack(def) {
     if (inPit) { if (pitSide > 0) ra = Math.max(ra, pitOff + 22); else rb = Math.max(rb, pitOff + 22); }
     return { x1: cx + nx * ra, y1: cy + ny * ra, x2: cx - nx * rb, y2: cy - ny * rb };
   });
+  // Punkt-zu-Punkt: nur Checkpoints innerhalb der Karte (mit Abstand zum Rand)
+  if (def.p2p) t.checkpoints = t.checkpoints.filter((c, k) => { const mx = (c.x1 + c.x2) / 2, my = (c.y1 + c.y2) / 2; return k === 0 || (mx > 110 && my > 110 && mx < W - 110 && my < H - 110); });
   // Checkpoints im abgekürzten Abschnitt entfernen (sonst wäre die Abkürzung ungültig)
   const inSkip = (i, sc) => sc.ia < sc.ib ? i > sc.ia && i < sc.ib : i > sc.ia || i < sc.ib;
   if (shorts.length) t.checkpoints = t.checkpoints.filter((c, k) => k === 0 || !shorts.some(sc => inSkip(nearestIndex(center, (c.x1 + c.x2) / 2, (c.y1 + c.y2) / 2), sc)));
@@ -593,6 +597,7 @@ function generateTrack(def) {
     objs.push({ t: rock ? 'rock' : 'bush', x, y, a: rng() * 6.28, w, h: w });
     if (rock) pr++; else pb++;
   }
+  if (def.p2p) t.objects = t.objects.filter(o => o.x > 4 && o.y > 4 && o.x < W - 4 && o.y < H - 4);
   return t;
 }
 const objRadius = o => OBJ_DEF[o.t] && OBJ_DEF[o.t].round ? o.w / 2 : Math.hypot(o.w, o.h) / 2;

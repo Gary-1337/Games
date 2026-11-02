@@ -570,7 +570,7 @@ const Game = {
   async pauseAct(act) {
     if (act === 'resume') this.resume();
     else if (act === 'camera') { cycleCamera(this.race); UI.pause(); }
-    else if (act === 'restart') { if (this.lastCfg.mode === 'champ') this.startChampRace(); else this.startRace(this.lastCfg); }
+    else if (act === 'restart') { if (this.lastCfg.mode === 'rally') Rally.restart(); else if (this.lastCfg.mode === 'champ') this.startChampRace(); else this.startRace(this.lastCfg); }
     else if (act === 'quit') {
       const m = this.race.mode;
       if (m === 'test') { Sound.stopEngines(); this.race = null; Editor.open(); return; }
@@ -589,6 +589,7 @@ const Game = {
     const R = this.race;
     if (R === this.demo || R == null) return;
     Sound.stopEngines();
+    if (R.mode === 'rally') { Rally.done(R); return; }
     R.results = computeResults(R);
     if (R.mode === 'champ') {
       const C = this.champ;
@@ -611,6 +612,7 @@ const Game = {
     UI.results(R, extra);
   },
   resultsAct(act) {
+    if (this.lastCfg && this.lastCfg.mode === 'rally' && (act === 'again' || act === 'setup')) { if (act === 'again') Rally.restart(); else { this.state = 'menu'; this.race = null; Rally.ui(); } return; }
     if (act === 'again') this.startRace(this.lastCfg);
     else if (act === 'menu') this.toMenu();
     else if (act === 'setup') { this.state = 'menu'; this.race = null; UI.setup(this.lastCfg.mode); }

@@ -1,27 +1,21 @@
 # Claude Rallye – Arbeitsstand (Übergabe)
 
-Stand: 02.11.2026. Aktuell ist **Version 1.7.0-beta3** (`index.html`). Sie ist spielbar und getestet. Die Details stehen im `CHANGELOG.md`.
+Stand: 02.11.2026. Aktuell ist **Version 1.7.0** (`index.html`). Alle Punkte der Version 1.7 sind umgesetzt und getestet. Details stehen im `CHANGELOG.md`.
 
 ## Vorgaben des Nutzers
-- Höchstens **3 Versionsstände** in `versions/` (ältere löschen; dank Git-Historie bleiben sie trotzdem abrufbar). Derzeit: `index-v1.6.2.html`, `index-v1.6.3.html` (letzte stabile), `index-v1.7.0-beta2.html`.
-- Kommentator **standardmäßig aus**. Bevorzugt eine männliche Stimme, wählbar in den Optionen.
-- Seit 02.11.2026 liegt alles im GitHub-Repository `Gary-1337/games` (privat), Ordner `claude-rallye/`.
-
-## Version 1.7 (vom Nutzer freigegeben, Lieferung „alles auf einmal“)
-
-### Erledigt (in 1.7.0-beta3 enthalten)
-- **Kommentator:** Objekt `Speaker` (`speechSynthesis`, de-DE), bevorzugt männliche/natürliche Stimmen, Stimmenauswahl, Option `commentary` (Standard aus), abwechselnde Formulierungen.
-- **Minikarte bei Zoom:** `drawMinimap` in der Seitenleiste.
-- **Positionsanzeige:** `drawGaps` (Abstand vor/hinter in Sekunden), `drawEdgeArrows` (Pfeile zu Gegnern am Bildrand).
-
-### Offen
-1. **Power-ups (Arcade):** Nitro-Pads und einsammelbare Kisten mit Zufallsitem (Nitro, Öl werfen, Schutzschild), per Taste ausgelöst (Vorschlag: Spieler 1 Shift oder Strg, Gamepad B/LB). **Standard aus**, im Setup als Regel einschaltbar, in der Karriere keine Power-ups. Die KI nutzt Items ebenfalls.
-2. **Punkt-zu-Punkt-Rallye** (neuer Modus): Etappe aus 3–4 zusammenhängenden, bildschirmgroßen Abschnitten (je 1280×800), Wechsel am Rand, allein gegen die Uhr, Bestzeiten je Etappe. Vorschlag: 3 Etappen (Wald, Schnee, Wüste).
-3. **Bessere Menüs:** animierte Streckenvorschau im Setup, Autoauswahl mit 3D-Drehansicht (`drawCar3D` auf kleinem Canvas, Winkel animiert).
-4. Danach: volle Tests, Version 1.7.0, CHANGELOG, Versionsablage (max. 3).
+- Höchstens **3 Versionsstände** in `versions/`, ältere löschen (Git-Historie behält sie). Derzeit: `index-v1.6.3.html` (letzte 1.6), `index-v1.7.0-beta4.html`, `index-v1.7.0.html`.
+- Kommentator **standardmäßig aus**, bevorzugt männliche Stimme.
+- Power-ups standardmäßig aus, nie in Karriere, Zeitfahren und Derby.
+- Ablage: GitHub-Repository `Gary-1337/Games` (privat), Ordner `claude-rallye/`. Startseite `index.html` im Hauptordner verlinkt alle Spiele.
 
 ## Technik
-- Quellen in `src/*`, `build.sh` setzt sie zu `index.html` zusammen (Reihenfolge siehe `build.sh`). Immer `src/` ändern, dann bauen.
-- Beispielstrecken in `TRACK_DEFS`: `ctrl` ist die Mittellinie (Catmull-Rom); Geraden = mehrere Punkte auf einer Linie. `pit` ist nur ein Schalter, der Pfad wird automatisch erzeugt.
-- Abkürzsperren (Reifenstapel) und Checkpoint-Fahnen werden automatisch erzeugt.
-- Tests (Python + Playwright): `tests/regression.py` (KI-Rennen auf allen Strecken), `tests/modes.py` (Ausscheidung, Derby).
+- Quellen in `src/*`, `build.sh` setzt sie zu `index.html` zusammen. Immer `src/` ändern, dann bauen.
+- `src/55_powerups.js`: Objekt `PU` (setup/update/use/aiUse/draw…), Items `ITEMS`, Tasten `ITEM_KEYS`. Felder am Auto: `item`, `boostT`, `shieldT`, `oilT`. Am Rennen: `R.powerups`, `R.pads`, `R.boxes`, `R.slicks`. Regel `rules.powerups`.
+- `src/58_rally.js`: `RALLY_STAGES` (Abschnitte mit `in`/`out` am Rand und `via`-Punkten), `getRallySection` baut daraus eine geschlossene Linie, deren Rückweg weit außerhalb der Karte liegt (`def.p2p` in `generateTrack`: kein Wasser außerhalb, nur Checkpoints ≥ 110 px vom Rand, Objekte nur in der Karte). `Rally.check` erkennt die Ausfahrt (alle Checkpoints, `nextCp === 0`), `Rally.nextSection` übernimmt Tempo und Schaden. Folgeabschnitte werden beim Start vorab gebaut (`cur.pre`). Bestzeiten in `localStorage` `cr_rally_<id>`.
+- Setup-Animation: `UI.startSetupAnim` (Autos auf der Vorschau, 3D-Drehansicht `canvas.car3d`).
+- Tests (Python + Playwright): `tests/regression.py` (KI-Rennen, alle Strecken), `tests/modes.py` (Ausscheidung, Derby), `tests/powerups.py`, `tests/rally.py`.
+
+## Mögliche nächste Schritte (nur nach Rückfrage)
+- Etappen länger machen (4. Abschnitt) oder Etappen-Editor.
+- Bei Zoom-Wechsel (C) mitten in der Etappe werden die vorab gebauten Folgeabschnitte nicht in hoher Auflösung neu aufgebaut (dann etwas unschärfer).
+- Rallye-Ghost je Etappe.

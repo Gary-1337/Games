@@ -393,8 +393,8 @@ function buildTrackLayers(t, opt = {}) {
 }
 /** Vorschaubild (für Menüs), zwischengespeichert. */
 const previewCache = {};
-function trackPreview(id) {
-  const t = getTrack(id); if (!t) return null;
+function trackPreview(id, tObj) {
+  const t = tObj || getTrack(id); if (!t) return null;
   const key = id + ':' + (t.custom ? JSON.stringify(encodeTrack(t)).length : 'b');
   if (previewCache[key]) return previewCache[key];
   // Vorschau in der schrägen Ansicht (ohne Autos)

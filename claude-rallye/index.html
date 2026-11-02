@@ -53,14 +53,14 @@ input,select{font-family:inherit}
 .wrap{position:absolute;inset:0;padding:34px 44px}
 
 /* Hauptmenü */
-#scr-main .logo{position:absolute;left:80px;top:56px}
+#scr-main .logo{position:absolute;left:80px;top:40px}
 .logo h1{font-family:'Russo One',sans-serif;font-size:92px;line-height:.9;margin:0;letter-spacing:2px;
   color:#fff;text-shadow:0 6px 0 #b8401a,0 10px 30px rgba(255,106,43,.35)}
 .logo h1 span{color:var(--accent)}
 .logo .sub{margin-top:14px;font-size:20px;color:var(--muted);letter-spacing:6px;text-transform:uppercase}
-.mainmenu{position:absolute;left:80px;top:276px;display:flex;flex-direction:column;gap:6px;width:380px}
+.mainmenu{position:absolute;left:80px;top:250px;display:flex;flex-direction:column;gap:5px;width:380px}
 .mbtn{display:flex;align-items:center;gap:14px;background:rgba(21,27,38,.85);border:1px solid var(--line);
-  color:var(--text);font-size:20px;font-weight:600;padding:8px 18px;border-radius:10px;text-align:left;
+  color:var(--text);font-size:19px;font-weight:600;padding:6px 18px;border-radius:10px;text-align:left;
   transition:transform .08s,background .12s,border-color .12s}
 .mbtn:hover,.mbtn:focus{background:var(--panel3);border-color:var(--accent);transform:translateX(6px);outline:none}
 .mbtn .ico{width:28px;text-align:center;color:var(--accent);font-size:20px}
@@ -247,7 +247,7 @@ kbd{background:#0f141d;border:1px solid var(--line);border-bottom-width:2px;bord
 /* =====================================================================
    1  GRUNDLAGEN
    ===================================================================== */
-const VERSION = '1.7.0-beta4';
+const VERSION = '1.7.0';
 const W = 1280, H = 800;              // Weltgröße in Pixeln (eine Strecke = ein Bildschirm)
 const PANEL = 260;                    // Breite der Seitenleiste
 const CW = W + PANEL;                 // Canvas-Gesamtbreite
@@ -1125,7 +1125,9 @@ function generateTrack(def) {
     const a = tg[(i - K + n) % n], b = tg[(i + K) % n];
     curv[i] = Math.atan2(a.x * b.y - a.y * b.x, a.x * b.x + a.y * b.y) / (2 * K * 4);
   }
-  const preWater = center.map(p => !!SURF[cellAt(t, p.x, p.y)].oob);
+  // Punkt-zu-Punkt-Abschnitte: Der Rückweg der (geschlossenen) Linie verläuft außerhalb der Karte und zählt nicht als Wasser
+  const inWorld = p => p.x >= 0 && p.y >= 0 && p.x <= W && p.y <= H;
+  const preWater = center.map(p => (!def.p2p || inWorld(p)) && !!SURF[cellAt(t, p.x, p.y)].oob);
   const bridges = findBridges(t, def, center, tg, hw, preWater);
   const onBridge = (x, y, m) => bridges.some(b => { const [lx, ly] = localOf(b, x, y); return Math.abs(lx) <= b.w / 2 + m && Math.abs(ly) <= b.h / 2 + m; });
   const baseOnly = new Set([def.base]);
@@ -1227,6 +1229,8 @@ function generateTrack(def) {
     if (inPit) { if (pitSide > 0) ra = Math.max(ra, pitOff + 22); else rb = Math.max(rb, pitOff + 22); }
     return { x1: cx + nx * ra, y1: cy + ny * ra, x2: cx - nx * rb, y2: cy - ny * rb };
   });
+  // Punkt-zu-Punkt: nur Checkpoints innerhalb der Karte (mit Abstand zum Rand)
+  if (def.p2p) t.checkpoints = t.checkpoints.filter((c, k) => { const mx = (c.x1 + c.x2) / 2, my = (c.y1 + c.y2) / 2; return k === 0 || (mx > 110 && my > 110 && mx < W - 110 && my < H - 110); });
   // Checkpoints im abgekürzten Abschnitt entfernen (sonst wäre die Abkürzung ungültig)
   const inSkip = (i, sc) => sc.ia < sc.ib ? i > sc.ia && i < sc.ib : i > sc.ia || i < sc.ib;
   if (shorts.length) t.checkpoints = t.checkpoints.filter((c, k) => k === 0 || !shorts.some(sc => inSkip(nearestIndex(center, (c.x1 + c.x2) / 2, (c.y1 + c.y2) / 2), sc)));
@@ -1410,6 +1414,7 @@ function generateTrack(def) {
     objs.push({ t: rock ? 'rock' : 'bush', x, y, a: rng() * 6.28, w, h: w });
     if (rock) pr++; else pb++;
   }
+  if (def.p2p) t.objects = t.objects.filter(o => o.x > 4 && o.y > 4 && o.x < W - 4 && o.y < H - 4);
   return t;
 }
 const objRadius = o => OBJ_DEF[o.t] && OBJ_DEF[o.t].round ? o.w / 2 : Math.hypot(o.w, o.h) / 2;
@@ -2128,8 +2133,8 @@ function buildTrackLayers(t, opt = {}) {
 }
 /** Vorschaubild (für Menüs), zwischengespeichert. */
 const previewCache = {};
-function trackPreview(id) {
-  const t = getTrack(id); if (!t) return null;
+function trackPreview(id, tObj) {
+  const t = tObj || getTrack(id); if (!t) return null;
   const key = id + ':' + (t.custom ? JSON.stringify(encodeTrack(t)).length : 'b');
   if (previewCache[key]) return previewCache[key];
   // Vorschau in der schrägen Ansicht (ohne Autos)
@@ -4458,6 +4463,240 @@ const PU = {
   }
 };
 /* =====================================================================
+   10c  PUNKT-ZU-PUNKT-RALLYE: Etappen aus mehreren bildschirmgroßen Abschnitten, allein gegen die Uhr
+   Jeder Abschnitt ist intern eine geschlossene Linie; der Rückweg liegt außerhalb der Karte und wird nie befahren.
+   Am Ausfahrtsrand (nach allen Checkpoints) beginnt der nächste Abschnitt am gegenüberliegenden Rand.
+   ===================================================================== */
+const RALLY_STAGES = [
+  {
+    id: 'forest', name: 'Waldetappe', desc: 'Schotter zwischen Bäumen, drei Abschnitte', theme: 'meadow', base: S.GRASS, road: S.DIRT, width: 56,
+    extra: { trees: 140, treeGap: 12, bushes: 50, rocks: 20, noCurbs: true },
+    sections: [
+      { in: [0, 600], out: [1280, 250], via: [[150, 600], [330, 560], [430, 420], [330, 260], [430, 130], [630, 150], [710, 300], [640, 470], [790, 600], [990, 560], [1030, 380], [1140, 260]],
+        hills: [[250, 380, 200, 46], [880, 720, 220, 40], [900, 260, 160, 34]] },
+      { in: [0, 250], out: [900, 800], via: [[150, 250], [320, 200], [500, 280], [470, 450], [300, 560], [390, 700], [610, 690], [730, 530], [900, 440], [1080, 470], [1130, 620], [1000, 680], [900, 700]],
+        hills: [[640, 120, 220, 50], [180, 420, 140, 30], [1150, 260, 180, 40]], pre(t) { paintDisc(t, 640, 380, 50, S.WATER); } },
+      { in: [900, 0], out: [0, 480], via: [[900, 130], [1010, 260], [1150, 340], [1120, 510], [950, 570], [780, 470], [620, 380], [460, 450], [400, 610], [250, 670], [130, 560]],
+        hills: [[560, 160, 260, 54], [820, 700, 200, 36], [200, 300, 160, 30]] }
+    ]
+  },
+  {
+    id: 'snow', name: 'Schneeetappe', desc: 'Asphalt mit Eisplatten, rutschig', theme: 'snow', base: S.SNOW, road: S.ASPHALT, width: 64,
+    extra: { trees: 60, bushes: 8, rocks: 24, tiresAtCorners: true },
+    sections: [
+      { in: [0, 400], out: [1000, 0], via: [[150, 400], [330, 470], [520, 610], [710, 570], [770, 410], [630, 270], [680, 140], [860, 190], [960, 340], [1110, 300], [1080, 150], [1000, 90]],
+        hills: [[300, 200, 200, 50], [1000, 600, 240, 52], [460, 330, 90, 18]], post(t) { paintDisc(t, 515, 600, 40, S.ICE, new Set([S.ASPHALT, S.CURB])); paintDisc(t, 1100, 300, 36, S.ICE, new Set([S.ASPHALT, S.CURB])); } },
+      { in: [1000, 800], out: [1280, 200], via: [[1000, 670], [900, 560], [700, 600], [480, 640], [300, 560], [260, 380], [400, 250], [600, 320], [780, 230], [900, 130], [1080, 160], [1170, 200]],
+        hills: [[640, 450, 200, 44], [180, 160, 200, 56], [1150, 420, 160, 40]], pre(t) { paintDisc(t, 560, 460, 46, S.ICE); }, post(t) { paintDisc(t, 300, 560, 40, S.ICE, new Set([S.ASPHALT, S.CURB])); } },
+      { in: [0, 200], out: [1280, 620], via: [[150, 200], [360, 160], [530, 260], [490, 430], [300, 520], [420, 680], [640, 660], [770, 500], [900, 380], [1080, 420], [1160, 560]],
+        hills: [[220, 380, 160, 40], [700, 240, 220, 50], [1000, 680, 200, 40]], post(t) { paintDisc(t, 900, 380, 40, S.ICE, new Set([S.ASPHALT, S.CURB])); paintDisc(t, 420, 680, 34, S.ICE, new Set([S.ASPHALT, S.CURB])); } }
+    ]
+  },
+  {
+    id: 'desert', name: 'Wüstenetappe', desc: 'Schnelle Pisten durch Sand und Dünen', theme: 'desert', base: S.SAND, road: S.DIRT, width: 66,
+    extra: { trees: 24, bushes: 14, rocks: 36, runoff: S.GRAVEL },
+    sections: [
+      { in: [300, 800], out: [1280, 500], via: [[300, 680], [220, 540], [300, 380], [480, 330], [560, 180], [760, 140], [870, 280], [760, 430], [860, 570], [1060, 610], [1160, 520]],
+        hills: [[640, 600, 200, 46], [1000, 200, 220, 56], [120, 200, 160, 40]] },
+      { in: [0, 500], out: [1280, 300], via: [[150, 500], [320, 600], [520, 640], [630, 500], [520, 340], [600, 180], [800, 160], [910, 300], [1010, 460], [1170, 380]],
+        hills: [[330, 300, 170, 50], [800, 650, 220, 44], [1150, 640, 160, 40]], pre(t) { paintDisc(t, 300, 330, 46, S.WATER); } },
+      { in: [0, 300], out: [700, 0], via: [[150, 300], [300, 220], [480, 300], [530, 480], [400, 640], [600, 710], [820, 640], [900, 480], [1060, 420], [1150, 250], [1000, 160], [830, 180], [720, 100]],
+        hills: [[260, 520, 160, 40], [700, 420, 140, 36], [1150, 650, 200, 50]] }
+    ]
+  }
+];
+
+/** Rand, auf dem ein Randpunkt liegt, als Richtung nach außen. */
+function edgeDir(p) { return p[0] <= 0 ? [-1, 0] : p[0] >= W ? [1, 0] : p[1] <= 0 ? [0, -1] : [0, 1]; }
+/** Position auf dem Umfang eines weit außen liegenden Rechtecks (im Uhrzeigersinn ab oben links). */
+const RALLY_M = 900;
+function boxPerim(x, y) {
+  const x0 = -RALLY_M, y0 = -RALLY_M, x1 = W + RALLY_M, y1 = H + RALLY_M, w = x1 - x0, h = y1 - y0;
+  const dl = x - x0, dr = x1 - x, dt = y - y0, db = y1 - y, m = Math.min(dl, dr, dt, db);
+  if (m === dt) return clamp(x - x0, 0, w);
+  if (m === dr) return w + clamp(y - y0, 0, h);
+  if (m === db) return w + h + clamp(x1 - x, 0, w);
+  return 2 * w + h + clamp(y1 - y, 0, h);
+}
+const boxCorners = () => { const x0 = -RALLY_M, y0 = -RALLY_M, x1 = W + RALLY_M, y1 = H + RALLY_M, w = x1 - x0, h = y1 - y0; return [[x1, y0, w], [x1, y1, w + h], [x0, y1, 2 * w + h], [x0, y0, 2 * w + 2 * h]]; };
+
+const rallyCache = {};
+/** Abschnitt k der Etappe als fertige Strecke (zwischengespeichert). */
+function getRallySection(stage, k) {
+  const key = stage.id + '_' + k;
+  if (rallyCache[key]) return rallyCache[key];
+  const sec = stage.sections[k];
+  const di = edgeDir(sec.in), dO = edgeDir(sec.out);
+  const inO = [sec.in[0] + di[0] * 420, sec.in[1] + di[1] * 420], outO = [sec.out[0] + dO[0] * 420, sec.out[1] + dO[1] * 420];
+  // Rückweg außen herum (im Uhrzeigersinn) von outO nach inO
+  const per = 2 * (W + H + 4 * RALLY_M);
+  const pa = boxPerim(outO[0] + dO[0] * 120, outO[1] + dO[1] * 120), pb = boxPerim(inO[0] + di[0] * 120, inO[1] + di[1] * 120);
+  const back = [[outO[0] + dO[0] * 120, outO[1] + dO[1] * 120]];
+  const span = (pb - pa + per) % per;
+  for (const [cx, cy, pc] of boxCorners().concat(boxCorners().map(c => [c[0], c[1], c[2] + per]))) {
+    const d = pc - pa; if (d > 0 && d < span) back.push([cx, cy]);
+  }
+  back.push([inO[0] + di[0] * 120, inO[1] + di[1] * 120]);
+  const ctrl = [inO, sec.in, ...sec.via, sec.out, outO, ...back];
+  const def = {
+    id: 'rally_' + key, name: stage.name + ' ' + (k + 1), theme: stage.theme, base: stage.base, road: stage.road, width: stage.width,
+    seed: 500 + k * 17 + stage.id.length * 31, ctrl, start: sec.via[0], p2p: true, hills: sec.hills, pre: sec.pre, post: sec.post, ...stage.extra
+  };
+  const t = generateTrack(def);
+  t.rallyIn = sec.in; t.rallyOut = sec.out;
+  rallyCache[key] = t;
+  return t;
+}
+
+const Rally = {
+  cur: null,
+  sel: 0,
+  bestKey: id => 'cr_rally_' + id,
+  best(id) { return store.get(this.bestKey(id), []); },
+
+  /** Etappe starten. */
+  start(idx) {
+    const st = Options.data.setup, p = st.players[0];
+    const stage = RALLY_STAGES[idx];
+    this.cur = { idx, stage, sec: 0, splits: [], carry: null, player: { name: Options.data.names[0], cls: p.cls, color: COLORS[p.color] }, weather: resolveWeather(st.rallyWx || 0, 0) };
+    // Alle Abschnitte vorab aufbauen, damit der Wechsel am Bildrand ohne Ruckler klappt
+    toast('Etappe wird vorbereitet …', 1500);
+    const cur = this.cur;
+    setTimeout(() => {
+      if (this.cur !== cur) return;
+      cur.pre = [];
+      for (let k = 1; k < stage.sections.length; k++) { cur.sec = k; cur.pre[k] = createRace(this.cfg()); }
+      cur.sec = 0;
+      Game.startRace(this.cfg());
+    }, 60);
+  },
+  cfg() {
+    const c = this.cur;
+    return { mode: 'rally', track: getRallySection(c.stage, c.sec), laps: 1, ai: 0, diff: 0, players: [c.player], weather: c.weather,
+      rules: { fuelOn: false, fuelPct: 100, tireOn: false, tirePct: 100, dmgOn: true, dmgPct: 100, pits: false, powerups: false } };
+  },
+  restart() { if (this.cur) this.start(this.cur.idx); },
+
+  /** Jeder Physikschritt: Ausfahrt erreicht? */
+  check(race) {
+    const c = this.cur; if (!c) return;
+    const car = race.cars.find(x => x.human === 0); if (!car || car.finished || car.sink > 0) return;
+    const out = c.stage.sections[race.secInfo ? race.secInfo.k : c.sec].out, d = edgeDir(out);
+    const toEdge = d[0] < 0 ? car.x : d[0] > 0 ? W - car.x : d[1] < 0 ? car.y : H - car.y;
+    const along = Math.abs(d[0] ? car.y - out[1] : car.x - out[0]);
+    if (toEdge > 40 || along > 220 || car.vx * d[0] + car.vy * d[1] < -5) return;
+    if (!(car.lap >= 1 && car.nextCp === 0)) {
+      if (!car.exitWarnT || race.time - car.exitWarnT > 2) { car.exitWarnT = race.time; flashMsg(car, 'CHECKPOINT VERPASST – zurück!', '#ffcd32'); if (race.audible) Sound.beep(330, 0.25, 'square', 0.12); }
+      return;
+    }
+    c.splits.push(race.t);
+    if (c.sec + 1 >= c.stage.sections.length) {
+      finishCar(car, race);
+      race.state = 'ending'; race.endT = 1.6;
+      return;
+    }
+    c.carry = { speed: Math.max(80, fwdSpeed(car)), damage: car.damage };
+    c.sec++;
+    this.nextSection();
+  },
+  /** Nächsten Abschnitt nahtlos laden: Auto am Einfahrtsrand mit gleichem Tempo. */
+  nextSection() {
+    const c = this.cur;
+    const R = (c.pre && c.pre[c.sec]) || createRace(this.cfg());
+    if (c.pre) c.pre[c.sec] = null;
+    Particles.clear();
+    R.state = 'running'; R.cd = 0; R.t = 0; R.goT = 0; R.lastBeep = 0;
+    const car = R.cars[0], rt = R.rt, inP = c.stage.sections[c.sec].in, d = edgeDir(inP);
+    const px = inP[0] - d[0] * 40, py = inP[1] - d[1] * 40;
+    const pr = projectLine(rt, px, py, null, 0);
+    const p = lineAtS(rt, pr.s);
+    placeOnLine(car, rt, p.x, p.y, p.a, pr.i);
+    car.idx = pr.i; car.s = pr.s; car.lastValidS = pr.s;
+    car.vx = Math.cos(p.a) * c.carry.speed; car.vy = Math.sin(p.a) * c.carry.speed; car.damage = c.carry.damage;
+    car.freeze = 0; car.resetMsg = 0;
+    flashMsg(car, 'ABSCHNITT ' + (c.sec + 1) + '/' + c.stage.sections.length + ' · ' + fmtTime(c.splits.reduce((a, b) => a + b, 0)), '#ffffff');
+    if (Game.race) { R.cam = Game.race.cam; if (R.cam) R.cam.init = false; }
+    Game.race = R; Game.acc = 0;
+  },
+  total() { const c = this.cur; return c ? c.splits.reduce((a, b) => a + b, 0) + (Game.race && Game.race.mode === 'rally' && c.splits.length <= c.sec ? Game.race.t : 0) : 0; },
+
+  /** Etappe beendet → Bestzeit speichern, Ergebnis anzeigen. */
+  done(R) {
+    const c = this.cur, total = c.splits.reduce((a, b) => a + b, 0);
+    const list = this.best(c.stage.id);
+    const rec = { name: c.player.name, time: total, splits: c.splits.slice(), cls: CLASSES[c.player.cls].name, date: new Date().toLocaleDateString('de-AT') };
+    list.push(rec); list.sort((a, b) => a.time - b.time);
+    const top = list.slice(0, 10); store.set(this.bestKey(c.stage.id), top);
+    const rank = top.indexOf(rec) + 1;
+    Music.setDuck(1); Music.play(rank === 1 ? 'podium' : 'menu');
+    if (rank === 1 && R.audible) Speaker.say('Neue Bestzeit auf der ' + c.stage.name + '!', 'rrec', 8, 2);
+    const best = top[0];
+    let rows = c.splits.map((t, k) => {
+      const b = best && best !== rec && best.splits && best.splits[k] != null ? t - best.splits[k] : null;
+      return `<tr><td class="pos">${k + 1}</td><td>Abschnitt ${k + 1}</td><td>${fmtTime(t)}</td><td>${b == null ? '' : `<span style="color:${b <= 0 ? '#47d48a' : '#ff8a3d'}">${b <= 0 ? '−' : '+'}${Math.abs(b).toFixed(2)}</span>`}</td></tr>`;
+    }).join('');
+    rows += `<tr class="me"><td></td><td><b>Gesamt</b></td><td><b>${fmtTime(total)}</b></td><td>${rank === 1 ? '<b style="color:#ffd23e">BESTZEIT!</b>' : rank ? 'Platz ' + rank : ''}</td></tr>`;
+    const board = top.map((r, i) => `<tr class="${r === rec ? 'me' : ''}"><td class="pos">${i + 1}</td><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.cls)}</td><td>${fmtTime(r.time)}</td><td class="note">${r.date}</td></tr>`).join('');
+    Game.state = 'results';
+    $('scr-results').innerHTML = `<div class="dim"></div><div class="wrap">
+      <div class="head" style="margin-bottom:12px"><h2>Rallye – ${escapeHtml(c.stage.name)}</h2><div class="spacer"></div><span class="note">${escapeHtml(CLASSES[c.player.cls].name)} · Schaden ${Math.round(R.cars[0].damage)}%</span></div>
+      <div class="cols"><div class="col" style="flex:1;height:560px"><h3>Deine Fahrt</h3><table class="tbl"><tr><th></th><th>Abschnitt</th><th>Zeit</th><th>zur Bestzeit</th></tr>${rows}</table></div>
+      <div class="col" style="flex:1;height:560px"><h3>Bestzeiten</h3><table class="tbl"><tr><th>Pl.</th><th>Fahrer</th><th>Auto</th><th>Zeit</th><th>Datum</th></tr>${board}</table></div></div>
+      <div class="startbar"><button class="btn" data-act="menu">Hauptmenü</button><button class="btn" data-act="setup">Andere Etappe</button><button class="btn primary big" data-act="again">Nochmal fahren ▶</button></div></div>`;
+    showScreen('scr-results');
+  },
+
+  /* ---------- Auswahl-Bildschirm ---------- */
+  ui() {
+    UI.mode = 'rally';
+    const st = Options.data.setup, p = st.players[0];
+    const stage = RALLY_STAGES[this.sel] || RALLY_STAGES[0];
+    let list = '<h3>Etappe</h3><div class="tlist" style="grid-template-columns:1fr">';
+    for (let i = 0; i < RALLY_STAGES.length; i++) {
+      const s = RALLY_STAGES[i], b = this.best(s.id)[0];
+      list += `<div class="titem ${i === this.sel ? 'on' : ''}" data-act="rstage" data-v="${i}">${escapeHtml(s.name)}<span class="tag">${b ? fmtTime(b.time) : ''}</span></div>`;
+    }
+    list += `</div><div class="note" style="margin-top:12px;line-height:1.5">${escapeHtml(stage.desc)}.<br>Allein gegen die Uhr über ${stage.sections.length} Abschnitte. Am Bildrand geht es nahtlos in den nächsten Abschnitt – vorher müssen alle Checkpoints durchfahren sein. Schaden bleibt über die ganze Etappe erhalten.</div>`;
+    let prev = '<h3>Abschnitte</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+    stage.sections.forEach((_, k) => { prev += `<div><canvas class="rprev" data-k="${k}" width="448" height="280" style="width:100%;border-radius:6px;border:1px solid var(--line)"></canvas><div class="note">Abschnitt ${k + 1}</div></div>`; });
+    prev += '</div>';
+    const b = this.best(stage.id)[0];
+    if (b) prev += `<div class="note" style="margin-top:10px">Bestzeit: <b>${fmtTime(b.time)}</b> – ${escapeHtml(b.name)} (${escapeHtml(b.cls)})${b.splits ? ' · ' + b.splits.map(fmtTime).join(' / ') : ''}</div>`;
+    let plCol = `<h3>Fahrer</h3><div class="prow"><div class="top"><span class="badge" style="background:${COLORS[p.color]}">P1</span><span style="font-weight:600">${escapeHtml(Options.data.names[0])}</span><span class="keys">Pfeiltasten oder WASD · Reset R · Checkpoint Leertaste</span></div>
+      <div class="row" style="margin:4px 0">${seg('cls0', CLASSES.map(c => c.name), p.cls).replace('class="seg"', 'class="seg small"')}</div>
+      <div class="clsrow"><canvas class="car3d" width="300" height="150" data-i="0"></canvas><div class="clsdesc">${CLASSES[p.cls].desc}</div></div>
+      <div class="swatches" style="margin-top:8px">${COLORS.map((c, k) => `<span class="sw ${k === p.color ? 'on' : ''}" style="background:${c}" data-act="color0" data-v="${k}"></span>`).join('')}</div></div>`;
+    plCol += `<div class="row" style="margin-top:14px"><label class="l">Wetter</label>${seg('rwx', WEATHER_OPTS.map(w => w[1]), st.rallyWx || 0)}</div>`;
+    $('scr-setup').innerHTML = `<div class="dim"></div><div class="wrap">
+      <div class="head"><button class="btn" data-act="back">← Zurück</button><h2>Rallye – Punkt zu Punkt</h2><div class="spacer"></div></div>
+      <div class="cols"><div class="col" style="width:300px">${list}</div><div class="col" style="width:560px">${prev}</div><div class="col" style="flex:1">${plCol}</div></div>
+      <div class="startbar"><button class="btn primary big" data-act="start">Etappe starten ▶</button></div></div>`;
+    showScreen('scr-setup');
+    // Vorschaubilder nacheinander erzeugen (Generierung dauert etwas)
+    const tok = this.uiTok = (this.uiTok || 0) + 1;
+    const cvs = [...document.querySelectorAll('#scr-setup canvas.rprev')];
+    const draw = k => {
+      if (tok !== this.uiTok || k >= cvs.length) return;
+      const t = getRallySection(stage, k), pv = trackPreview(t.id, t);
+      if (pv) cvs[k].getContext('2d').drawImage(pv, 0, 0);
+      setTimeout(() => draw(k + 1), 20);
+    };
+    setTimeout(() => draw(0), 30);
+    UI.startSetupAnim(null, null, 1);
+  },
+  uiAct(act, v) {
+    const st = Options.data.setup, p = st.players[0];
+    if (act === 'back') { Options.save(); UI.mode = 'quick'; UI.main(); return; }
+    if (act === 'start') { Options.save(); this.start(this.sel); return; }
+    if (act === 'rstage') this.sel = +v;
+    else if (act === 'cls0') p.cls = +v;
+    else if (act === 'color0') p.color = +v;
+    else if (act === 'rwx') st.rallyWx = +v;
+    else return;
+    Sound.click(); this.ui();
+  }
+};
+/* =====================================================================
    11  RENNEN: Countdown, Checkpoints, Positionen, Boxendienst, Ziel, Rekorde, Ghost
    ===================================================================== */
 let race = null;
@@ -4572,6 +4811,7 @@ function createRace(cfg) {
   // Ghost laden (nur Zeitfahren)
   if (cfg.mode === 'trial') R.ghost = store.get('cr_ghost_' + src.id, null);
   // Power-ups: nur als Regel in Rennen/Ausscheidung/Championship, nie in der Karriere
+  if (cfg.mode === 'rally') { R.trackName = Rally.cur ? Rally.cur.stage.name : src.name; R.secInfo = Rally.cur ? { k: Rally.cur.sec, n: Rally.cur.stage.sections.length } : null; }
   R.powerups = !!R.rules.powerups && !R.career && ['quick', 'elim', 'champ', 'test'].includes(cfg.mode);
   R.pads = []; R.boxes = []; R.slicks = [];
   if (R.powerups) PU.setup(R);
@@ -4690,8 +4930,8 @@ function finishCar(car, race) {
   car.alpha = 0.55; car.service = { q: [], cur: null, t: 0, dur: 0 };
   if (car.human >= 0) {
     race.lastHumanFinishT = race.t;
-    flashMsg(car, car.finishOrder === 0 ? 'SIEG!' : 'IM ZIEL – Platz ' + (car.finishOrder + 1), '#ffffff');
-    if (race.mode !== 'trial') Speaker.say(car.finishOrder === 0 ? Speaker.pick(['Sieg für ' + car.name + '!', car.name + ' gewinnt! Was für ein Rennen!', 'Und der Sieger heißt ' + car.name + '!']) : car.name + Speaker.pick([' ist im Ziel, Platz ' + (car.finishOrder + 1) + '.', ' kommt als ' + (car.finishOrder + 1) + '. ins Ziel.']), 'fin' + car.id, 30, 2);
+    flashMsg(car, race.mode === 'rally' ? 'ZIEL!' : car.finishOrder === 0 ? 'SIEG!' : 'IM ZIEL – Platz ' + (car.finishOrder + 1), '#ffffff');
+    if (race.mode !== 'trial' && race.mode !== 'rally') Speaker.say(car.finishOrder === 0 ? Speaker.pick(['Sieg für ' + car.name + '!', car.name + ' gewinnt! Was für ein Rennen!', 'Und der Sieger heißt ' + car.name + '!']) : car.name + Speaker.pick([' ist im Ziel, Platz ' + (car.finishOrder + 1) + '.', ' kommt als ' + (car.finishOrder + 1) + '. ins Ziel.']), 'fin' + car.id, 30, 2);
     Sound.finish();
     car.ai = makeAI(car, 1);
   }
@@ -4777,6 +5017,7 @@ function updateRace(race, dt) {
     trackEffects(car, race, dt);
   }
 
+  if (race.mode === 'rally' && race.state === 'running') Rally.check(race);
   // --- Derby: Wracks, Rauch, Zeitlimit ---
   if (race.mode === 'derby') {
     for (const car of race.cars) {
@@ -4792,7 +5033,7 @@ function updateRace(race, dt) {
   sorted.forEach((c, i) => c.place = i + 1);
   const leader = sorted[0];
   // Kommentator: Führungswechsel, letzte Runde
-  if (race.audible && race.mode !== 'demo' && race.mode !== 'trial' && race.state === 'running' && race.t > 4) {
+  if (race.audible && race.mode !== 'demo' && race.mode !== 'trial' && race.mode !== 'rally' && race.state === 'running' && race.t > 4) {
     if (race.leaderId != null && race.leaderId !== leader.id && !leader.finished && (leader.human >= 0 || race.cars.find(c => c.id === race.leaderId).human >= 0))
       Speaker.say(leader.human >= 0 ? Speaker.pick([leader.name + ' übernimmt die Führung!', 'Wahnsinn, ' + leader.name + ' ist jetzt vorne!', leader.name + ' setzt sich an die Spitze!']) : Speaker.pick([leader.name + ' geht an die Spitze!', 'Führungswechsel! ' + leader.name + ' ist vorbei!', leader.name + ' schnappt sich Platz eins!']), 'lead', 6);
     if (race.mode !== 'derby' && race.laps > 1 && leader.lap === race.laps && !race.lastLapSaid) { race.lastLapSaid = true; Speaker.say(Speaker.pick(['Letzte Runde!', 'Die letzte Runde läuft – jetzt zählt\'s!', 'Glocke! Letzte Runde!']), 'lastlap', 10, 2); }
@@ -5169,7 +5410,7 @@ function drawRace(ctx, race) {
   if (race.state === 'ending' || race.state === 'done') {
     ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(0, 360, W, 80);
     ctx.fillStyle = '#fff'; ctx.font = '400 44px "Russo One",sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(race.mode === 'derby' ? (race.timeUp ? 'ZEIT ABGELAUFEN' : 'DERBY BEENDET') : 'RENNEN BEENDET', W / 2, 402);
+    ctx.fillText(race.mode === 'derby' ? (race.timeUp ? 'ZEIT ABGELAUFEN' : 'DERBY BEENDET') : race.mode === 'rally' ? 'ETAPPE BEENDET' : 'RENNEN BEENDET', W / 2, 402);
   }
 }
 /** Wolkenschatten, Licht (Abend/Nacht), Regen/Schnee, Blitze. */
@@ -5277,13 +5518,17 @@ function drawPanel(ctx, race) {
   ctx.fillStyle = '#fff'; ctx.font = '400 20px "Russo One",sans-serif'; ctx.fillText('CLAUDE', x0 + 14, 28);
   ctx.fillStyle = '#ff6a2b'; ctx.fillText('RALLYE', x0 + 100, 28);
   ctx.fillStyle = '#8a97ad'; ctx.font = '500 12px "Chakra Petch",sans-serif';
-  const modeName = race.career ? 'Karriere' : { quick: 'Schnelles Rennen', trial: 'Zeitfahren', champ: 'Championship', test: 'Testfahrt', demo: '', elim: 'Ausscheidung', derby: 'Demolition Derby' }[race.mode];
+  const modeName = race.career ? 'Karriere' : { quick: 'Schnelles Rennen', trial: 'Zeitfahren', champ: 'Championship', test: 'Testfahrt', demo: '', elim: 'Ausscheidung', derby: 'Demolition Derby', rally: 'Rallye' }[race.mode];
   ctx.fillText((race.trackName + (modeName ? ' · ' + modeName : '')).slice(0, 34), x0 + 14, 46);
   ctx.fillStyle = '#5d6a80'; ctx.textAlign = 'right'; ctx.fillText(WX_LABEL(race.weather), x0 + PANEL - 12, 28); ctx.textAlign = 'left';
   ctx.fillStyle = '#e9eef6'; ctx.font = '700 15px "Chakra Petch",sans-serif';
   const leader = race.cars.reduce((a, b) => b.key > a.key ? b : a);
   const alive = race.cars.filter(c => !c.out).length;
-  if (race.mode === 'derby') {
+  if (race.mode === 'rally') {
+    const si = race.secInfo || { k: 0, n: 1 };
+    ctx.fillText('Abschnitt ' + (si.k + 1) + ' / ' + si.n, x0 + 14, 66);
+    ctx.textAlign = 'right'; ctx.fillText(fmtTime(Rally.total()), x0 + PANEL - 12, 66); ctx.textAlign = 'left';
+  } else if (race.mode === 'derby') {
     ctx.fillText('Noch ' + alive + ' fahrbereit', x0 + 14, 66);
     const left = Math.max(0, race.timeLimit - race.t);
     ctx.textAlign = 'right'; ctx.fillStyle = left < 20 ? '#ff4d5e' : '#e9eef6'; ctx.fillText(fmtTime(left).replace(/\.\d+$/, ''), x0 + PANEL - 12, 66); ctx.textAlign = 'left';
@@ -5294,7 +5539,7 @@ function drawPanel(ctx, race) {
   // Rangliste
   let y = 82;
   const sorted = race.cars.slice().sort((a, b) => a.place - b.place);
-  if (race.mode !== 'trial') {
+  if (race.mode !== 'trial' && race.mode !== 'rally') {
     for (const c of sorted) {
       if (c.human >= 0) { ctx.fillStyle = 'rgba(255,106,43,.12)'; ctx.fillRect(x0 + 6, y, PANEL - 12, 20); }
       ctx.fillStyle = '#e9eef6'; ctx.font = '400 13px "Russo One",sans-serif'; ctx.fillText(String(c.place), x0 + 12, y + 15);
@@ -5335,6 +5580,26 @@ function drawPlayerCard(ctx, c, race, x, y, w, h) {
   ctx.fillStyle = '#fff'; ctx.font = '700 14px "Chakra Petch",sans-serif';
   ctx.fillText('P' + (c.human + 1) + '  ' + c.name.slice(0, 12), x + 12, y + 19);
   ctx.textAlign = 'right';
+  if (race.mode === 'rally') {
+    const C = Rally.cur, b = C ? Rally.best(C.stage.id)[0] : null, tot = Rally.total();
+    ctx.textAlign = 'left'; ctx.font = '500 11px "Chakra Petch",sans-serif'; ctx.fillStyle = '#8a97ad';
+    ctx.fillText(race.trackName + ' · Abschnitt ' + ((race.secInfo || { k: 0 }).k + 1), x + 12, y + 33);
+    const sp = C ? C.splits.length : 0, bs = b && b.splits ? b.splits.slice(0, sp).reduce((a, q) => a + q, 0) : null;
+    const cols = [['Gesamt', tot], ['Abschnitt', race.state === 'countdown' ? 0 : race.t], ['Bestzeit', b ? b.time : null]];
+    cols.forEach((col, i) => {
+      const cx = x + 12 + i * ((w - 18) / 3);
+      ctx.fillStyle = '#6f7d94'; ctx.font = '500 10px "Chakra Petch",sans-serif'; ctx.fillText(col[0], cx, y + 48);
+      ctx.fillStyle = i === 2 ? '#47d48a' : '#e9eef6'; ctx.font = '600 12px "Chakra Petch",sans-serif';
+      ctx.fillText(col[1] == null ? '–' : fmtTime(col[1]), cx, y + 61);
+    });
+    if (bs != null && sp > 0) { const dd = C.splits.reduce((a, q) => a + q, 0) - bs; ctx.fillStyle = dd <= 0 ? '#47d48a' : '#ff8a3d'; ctx.font = '700 11px "Chakra Petch",sans-serif'; ctx.fillText('Zwischenzeit ' + (dd <= 0 ? '−' : '+') + Math.abs(dd).toFixed(2) + ' s zur Bestzeit', x + 12, y + 80); }
+    const dmg = c.damage / 100;
+    ctx.fillStyle = '#6f7d94'; ctx.font = '500 10px "Chakra Petch",sans-serif'; ctx.fillText('Schaden', x + 12, y + 100);
+    ctx.fillStyle = '#0d1219'; ctx.fillRect(x + 62, y + 92, w - 108, 8);
+    ctx.fillStyle = dmg > 0.6 ? '#ff4d5e' : '#ff8a3d'; ctx.fillRect(x + 62, y + 92, (w - 108) * clamp(dmg, 0, 1), 8);
+    ctx.fillStyle = '#c4ccd9'; ctx.textAlign = 'right'; ctx.fillText(Math.round(c.damage) + '%', x + w - 10, y + 100); ctx.textAlign = 'left';
+    return;
+  }
   if (race.mode !== 'trial') { ctx.font = '400 22px "Russo One",sans-serif'; ctx.fillStyle = c.place === 1 ? '#ffd23e' : '#fff'; ctx.fillText(c.place + '.', x + w - 10, y + 23); }
   if (race.powerups) {
     const it = c.item && ITEMS[c.item], bx = x + w - 66, by = y + 6;
@@ -5413,7 +5678,7 @@ function drawGaps(ctx, me, race, x, y) {
 function drawMinimap(ctx, race, x, y, w, h) {
   const rt = race.rt, k = Math.min(w / W, h / H), ox = x + (w - W * k) / 2, oy = y + (h - H * k) / 2;
   ctx.fillStyle = '#18202c'; rr(ctx, x, y, w, h, 8); ctx.fill();
-  ctx.save(); ctx.translate(ox, oy); ctx.scale(k, k);
+  ctx.save(); ctx.beginPath(); ctx.rect(ox, oy, W * k, H * k); ctx.clip(); ctx.translate(ox, oy); ctx.scale(k, k);
   ctx.lineJoin = 'round'; ctx.lineCap = 'round';
   if (rt.pit) { ctx.strokeStyle = 'rgba(255,205,50,.5)'; ctx.lineWidth = 10; ctx.beginPath(); rt.pit.path.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.stroke(); }
   ctx.strokeStyle = '#5d6a80'; ctx.lineWidth = 26; ctx.beginPath();
@@ -5543,6 +5808,7 @@ const UI = {
         <button class="mbtn" data-act="career"><span class="ico">★</span><span>Karriere<small>Ligen, Preisgeld, neue Autos</small></span></button>
         <button class="mbtn" data-act="quick"><span class="ico">▶</span><span>Schnelles Rennen<small>Rennen, Ausscheidung oder Demolition Derby</small></span></button>
         <button class="mbtn" data-act="trial"><span class="ico">⏱</span><span>Zeitfahren<small>Gegen die Uhr und den eigenen Ghost</small></span></button>
+        <button class="mbtn" data-act="rally"><span class="ico">⛰</span><span>Rallye-Etappe<small>Punkt zu Punkt über mehrere Abschnitte</small></span></button>
         <button class="mbtn" data-act="champ"><span class="ico">🏆</span><span>Championship<small>Mehrere Rennen, Punktewertung</small></span></button>
         <button class="mbtn" data-act="editor"><span class="ico">✎</span><span>Streckeneditor<small>Eigene Kurse malen und teilen</small></span></button>
         <button class="mbtn" data-act="board"><span class="ico">≡</span><span>Bestenliste<small>Rundenrekorde je Strecke</small></span></button>
@@ -5896,12 +6162,14 @@ function bindScreens() {
       Sound.click();
       if (act === 'quick' || act === 'trial' || act === 'champ') UI.setup(act);
       else if (act === 'career') Career.open();
+      else if (act === 'rally') Rally.ui();
       else if (act === 'fullscreen') toggleFullscreen();
       else if (act === 'editor') Editor.open();
       else if (act === 'board') UI.board();
       else if (act === 'options') UI.options();
     } else if (scr === 'scr-setup') {
       if (act === 'name') { Options.data.names[+v] = el.value.trim().slice(0, 14) || ('Spieler ' + (+v + 1)); Options.save(); return; }
+      if (UI.mode === 'rally') { Rally.uiAct(act, v, el); return; }
       UI.setupAct(act, v, el);
     } else if (scr === 'scr-options') {
       if (act === 'oname') { Options.data.names[+v] = el.value.trim().slice(0, 14) || ('Spieler ' + (+v + 1)); Options.save(); return; }
@@ -6718,7 +6986,7 @@ const Game = {
   async pauseAct(act) {
     if (act === 'resume') this.resume();
     else if (act === 'camera') { cycleCamera(this.race); UI.pause(); }
-    else if (act === 'restart') { if (this.lastCfg.mode === 'champ') this.startChampRace(); else this.startRace(this.lastCfg); }
+    else if (act === 'restart') { if (this.lastCfg.mode === 'rally') Rally.restart(); else if (this.lastCfg.mode === 'champ') this.startChampRace(); else this.startRace(this.lastCfg); }
     else if (act === 'quit') {
       const m = this.race.mode;
       if (m === 'test') { Sound.stopEngines(); this.race = null; Editor.open(); return; }
@@ -6737,6 +7005,7 @@ const Game = {
     const R = this.race;
     if (R === this.demo || R == null) return;
     Sound.stopEngines();
+    if (R.mode === 'rally') { Rally.done(R); return; }
     R.results = computeResults(R);
     if (R.mode === 'champ') {
       const C = this.champ;
@@ -6759,6 +7028,7 @@ const Game = {
     UI.results(R, extra);
   },
   resultsAct(act) {
+    if (this.lastCfg && this.lastCfg.mode === 'rally' && (act === 'again' || act === 'setup')) { if (act === 'again') Rally.restart(); else { this.state = 'menu'; this.race = null; Rally.ui(); } return; }
     if (act === 'again') this.startRace(this.lastCfg);
     else if (act === 'menu') this.toMenu();
     else if (act === 'setup') { this.state = 'menu'; this.race = null; UI.setup(this.lastCfg.mode); }

@@ -188,7 +188,7 @@ function drawRace(ctx, race) {
   if (race.state === 'ending' || race.state === 'done') {
     ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(0, 360, W, 80);
     ctx.fillStyle = '#fff'; ctx.font = '400 44px "Russo One",sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(race.mode === 'derby' ? (race.timeUp ? 'ZEIT ABGELAUFEN' : 'DERBY BEENDET') : 'RENNEN BEENDET', W / 2, 402);
+    ctx.fillText(race.mode === 'derby' ? (race.timeUp ? 'ZEIT ABGELAUFEN' : 'DERBY BEENDET') : race.mode === 'rally' ? 'ETAPPE BEENDET' : 'RENNEN BEENDET', W / 2, 402);
   }
 }
 /** Wolkenschatten, Licht (Abend/Nacht), Regen/Schnee, Blitze. */
@@ -296,13 +296,17 @@ function drawPanel(ctx, race) {
   ctx.fillStyle = '#fff'; ctx.font = '400 20px "Russo One",sans-serif'; ctx.fillText('CLAUDE', x0 + 14, 28);
   ctx.fillStyle = '#ff6a2b'; ctx.fillText('RALLYE', x0 + 100, 28);
   ctx.fillStyle = '#8a97ad'; ctx.font = '500 12px "Chakra Petch",sans-serif';
-  const modeName = race.career ? 'Karriere' : { quick: 'Schnelles Rennen', trial: 'Zeitfahren', champ: 'Championship', test: 'Testfahrt', demo: '', elim: 'Ausscheidung', derby: 'Demolition Derby' }[race.mode];
+  const modeName = race.career ? 'Karriere' : { quick: 'Schnelles Rennen', trial: 'Zeitfahren', champ: 'Championship', test: 'Testfahrt', demo: '', elim: 'Ausscheidung', derby: 'Demolition Derby', rally: 'Rallye' }[race.mode];
   ctx.fillText((race.trackName + (modeName ? ' · ' + modeName : '')).slice(0, 34), x0 + 14, 46);
   ctx.fillStyle = '#5d6a80'; ctx.textAlign = 'right'; ctx.fillText(WX_LABEL(race.weather), x0 + PANEL - 12, 28); ctx.textAlign = 'left';
   ctx.fillStyle = '#e9eef6'; ctx.font = '700 15px "Chakra Petch",sans-serif';
   const leader = race.cars.reduce((a, b) => b.key > a.key ? b : a);
   const alive = race.cars.filter(c => !c.out).length;
-  if (race.mode === 'derby') {
+  if (race.mode === 'rally') {
+    const si = race.secInfo || { k: 0, n: 1 };
+    ctx.fillText('Abschnitt ' + (si.k + 1) + ' / ' + si.n, x0 + 14, 66);
+    ctx.textAlign = 'right'; ctx.fillText(fmtTime(Rally.total()), x0 + PANEL - 12, 66); ctx.textAlign = 'left';
+  } else if (race.mode === 'derby') {
     ctx.fillText('Noch ' + alive + ' fahrbereit', x0 + 14, 66);
     const left = Math.max(0, race.timeLimit - race.t);
     ctx.textAlign = 'right'; ctx.fillStyle = left < 20 ? '#ff4d5e' : '#e9eef6'; ctx.fillText(fmtTime(left).replace(/\.\d+$/, ''), x0 + PANEL - 12, 66); ctx.textAlign = 'left';
@@ -313,7 +317,7 @@ function drawPanel(ctx, race) {
   // Rangliste
   let y = 82;
   const sorted = race.cars.slice().sort((a, b) => a.place - b.place);
-  if (race.mode !== 'trial') {
+  if (race.mode !== 'trial' && race.mode !== 'rally') {
     for (const c of sorted) {
       if (c.human >= 0) { ctx.fillStyle = 'rgba(255,106,43,.12)'; ctx.fillRect(x0 + 6, y, PANEL - 12, 20); }
       ctx.fillStyle = '#e9eef6'; ctx.font = '400 13px "Russo One",sans-serif'; ctx.fillText(String(c.place), x0 + 12, y + 15);
@@ -354,6 +358,26 @@ function drawPlayerCard(ctx, c, race, x, y, w, h) {
   ctx.fillStyle = '#fff'; ctx.font = '700 14px "Chakra Petch",sans-serif';
   ctx.fillText('P' + (c.human + 1) + '  ' + c.name.slice(0, 12), x + 12, y + 19);
   ctx.textAlign = 'right';
+  if (race.mode === 'rally') {
+    const C = Rally.cur, b = C ? Rally.best(C.stage.id)[0] : null, tot = Rally.total();
+    ctx.textAlign = 'left'; ctx.font = '500 11px "Chakra Petch",sans-serif'; ctx.fillStyle = '#8a97ad';
+    ctx.fillText(race.trackName + ' · Abschnitt ' + ((race.secInfo || { k: 0 }).k + 1), x + 12, y + 33);
+    const sp = C ? C.splits.length : 0, bs = b && b.splits ? b.splits.slice(0, sp).reduce((a, q) => a + q, 0) : null;
+    const cols = [['Gesamt', tot], ['Abschnitt', race.state === 'countdown' ? 0 : race.t], ['Bestzeit', b ? b.time : null]];
+    cols.forEach((col, i) => {
+      const cx = x + 12 + i * ((w - 18) / 3);
+      ctx.fillStyle = '#6f7d94'; ctx.font = '500 10px "Chakra Petch",sans-serif'; ctx.fillText(col[0], cx, y + 48);
+      ctx.fillStyle = i === 2 ? '#47d48a' : '#e9eef6'; ctx.font = '600 12px "Chakra Petch",sans-serif';
+      ctx.fillText(col[1] == null ? '–' : fmtTime(col[1]), cx, y + 61);
+    });
+    if (bs != null && sp > 0) { const dd = C.splits.reduce((a, q) => a + q, 0) - bs; ctx.fillStyle = dd <= 0 ? '#47d48a' : '#ff8a3d'; ctx.font = '700 11px "Chakra Petch",sans-serif'; ctx.fillText('Zwischenzeit ' + (dd <= 0 ? '−' : '+') + Math.abs(dd).toFixed(2) + ' s zur Bestzeit', x + 12, y + 80); }
+    const dmg = c.damage / 100;
+    ctx.fillStyle = '#6f7d94'; ctx.font = '500 10px "Chakra Petch",sans-serif'; ctx.fillText('Schaden', x + 12, y + 100);
+    ctx.fillStyle = '#0d1219'; ctx.fillRect(x + 62, y + 92, w - 108, 8);
+    ctx.fillStyle = dmg > 0.6 ? '#ff4d5e' : '#ff8a3d'; ctx.fillRect(x + 62, y + 92, (w - 108) * clamp(dmg, 0, 1), 8);
+    ctx.fillStyle = '#c4ccd9'; ctx.textAlign = 'right'; ctx.fillText(Math.round(c.damage) + '%', x + w - 10, y + 100); ctx.textAlign = 'left';
+    return;
+  }
   if (race.mode !== 'trial') { ctx.font = '400 22px "Russo One",sans-serif'; ctx.fillStyle = c.place === 1 ? '#ffd23e' : '#fff'; ctx.fillText(c.place + '.', x + w - 10, y + 23); }
   if (race.powerups) {
     const it = c.item && ITEMS[c.item], bx = x + w - 66, by = y + 6;
@@ -432,7 +456,7 @@ function drawGaps(ctx, me, race, x, y) {
 function drawMinimap(ctx, race, x, y, w, h) {
   const rt = race.rt, k = Math.min(w / W, h / H), ox = x + (w - W * k) / 2, oy = y + (h - H * k) / 2;
   ctx.fillStyle = '#18202c'; rr(ctx, x, y, w, h, 8); ctx.fill();
-  ctx.save(); ctx.translate(ox, oy); ctx.scale(k, k);
+  ctx.save(); ctx.beginPath(); ctx.rect(ox, oy, W * k, H * k); ctx.clip(); ctx.translate(ox, oy); ctx.scale(k, k);
   ctx.lineJoin = 'round'; ctx.lineCap = 'round';
   if (rt.pit) { ctx.strokeStyle = 'rgba(255,205,50,.5)'; ctx.lineWidth = 10; ctx.beginPath(); rt.pit.path.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.stroke(); }
   ctx.strokeStyle = '#5d6a80'; ctx.lineWidth = 26; ctx.beginPath();

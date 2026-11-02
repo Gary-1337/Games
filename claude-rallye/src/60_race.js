@@ -113,6 +113,7 @@ function createRace(cfg) {
   // Ghost laden (nur Zeitfahren)
   if (cfg.mode === 'trial') R.ghost = store.get('cr_ghost_' + src.id, null);
   // Power-ups: nur als Regel in Rennen/Ausscheidung/Championship, nie in der Karriere
+  if (cfg.mode === 'rally') { R.trackName = Rally.cur ? Rally.cur.stage.name : src.name; R.secInfo = Rally.cur ? { k: Rally.cur.sec, n: Rally.cur.stage.sections.length } : null; }
   R.powerups = !!R.rules.powerups && !R.career && ['quick', 'elim', 'champ', 'test'].includes(cfg.mode);
   R.pads = []; R.boxes = []; R.slicks = [];
   if (R.powerups) PU.setup(R);
@@ -231,8 +232,8 @@ function finishCar(car, race) {
   car.alpha = 0.55; car.service = { q: [], cur: null, t: 0, dur: 0 };
   if (car.human >= 0) {
     race.lastHumanFinishT = race.t;
-    flashMsg(car, car.finishOrder === 0 ? 'SIEG!' : 'IM ZIEL – Platz ' + (car.finishOrder + 1), '#ffffff');
-    if (race.mode !== 'trial') Speaker.say(car.finishOrder === 0 ? Speaker.pick(['Sieg für ' + car.name + '!', car.name + ' gewinnt! Was für ein Rennen!', 'Und der Sieger heißt ' + car.name + '!']) : car.name + Speaker.pick([' ist im Ziel, Platz ' + (car.finishOrder + 1) + '.', ' kommt als ' + (car.finishOrder + 1) + '. ins Ziel.']), 'fin' + car.id, 30, 2);
+    flashMsg(car, race.mode === 'rally' ? 'ZIEL!' : car.finishOrder === 0 ? 'SIEG!' : 'IM ZIEL – Platz ' + (car.finishOrder + 1), '#ffffff');
+    if (race.mode !== 'trial' && race.mode !== 'rally') Speaker.say(car.finishOrder === 0 ? Speaker.pick(['Sieg für ' + car.name + '!', car.name + ' gewinnt! Was für ein Rennen!', 'Und der Sieger heißt ' + car.name + '!']) : car.name + Speaker.pick([' ist im Ziel, Platz ' + (car.finishOrder + 1) + '.', ' kommt als ' + (car.finishOrder + 1) + '. ins Ziel.']), 'fin' + car.id, 30, 2);
     Sound.finish();
     car.ai = makeAI(car, 1);
   }
@@ -318,6 +319,7 @@ function updateRace(race, dt) {
     trackEffects(car, race, dt);
   }
 
+  if (race.mode === 'rally' && race.state === 'running') Rally.check(race);
   // --- Derby: Wracks, Rauch, Zeitlimit ---
   if (race.mode === 'derby') {
     for (const car of race.cars) {
@@ -333,7 +335,7 @@ function updateRace(race, dt) {
   sorted.forEach((c, i) => c.place = i + 1);
   const leader = sorted[0];
   // Kommentator: Führungswechsel, letzte Runde
-  if (race.audible && race.mode !== 'demo' && race.mode !== 'trial' && race.state === 'running' && race.t > 4) {
+  if (race.audible && race.mode !== 'demo' && race.mode !== 'trial' && race.mode !== 'rally' && race.state === 'running' && race.t > 4) {
     if (race.leaderId != null && race.leaderId !== leader.id && !leader.finished && (leader.human >= 0 || race.cars.find(c => c.id === race.leaderId).human >= 0))
       Speaker.say(leader.human >= 0 ? Speaker.pick([leader.name + ' übernimmt die Führung!', 'Wahnsinn, ' + leader.name + ' ist jetzt vorne!', leader.name + ' setzt sich an die Spitze!']) : Speaker.pick([leader.name + ' geht an die Spitze!', 'Führungswechsel! ' + leader.name + ' ist vorbei!', leader.name + ' schnappt sich Platz eins!']), 'lead', 6);
     if (race.mode !== 'derby' && race.laps > 1 && leader.lap === race.laps && !race.lastLapSaid) { race.lastLapSaid = true; Speaker.say(Speaker.pick(['Letzte Runde!', 'Die letzte Runde läuft – jetzt zählt\'s!', 'Glocke! Letzte Runde!']), 'lastlap', 10, 2); }

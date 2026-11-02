@@ -95,6 +95,7 @@ const UI = {
         <button class="mbtn" data-act="career"><span class="ico">★</span><span>Karriere<small>Ligen, Preisgeld, neue Autos</small></span></button>
         <button class="mbtn" data-act="quick"><span class="ico">▶</span><span>Schnelles Rennen<small>Rennen, Ausscheidung oder Demolition Derby</small></span></button>
         <button class="mbtn" data-act="trial"><span class="ico">⏱</span><span>Zeitfahren<small>Gegen die Uhr und den eigenen Ghost</small></span></button>
+        <button class="mbtn" data-act="rally"><span class="ico">⛰</span><span>Rallye-Etappe<small>Punkt zu Punkt über mehrere Abschnitte</small></span></button>
         <button class="mbtn" data-act="champ"><span class="ico">🏆</span><span>Championship<small>Mehrere Rennen, Punktewertung</small></span></button>
         <button class="mbtn" data-act="editor"><span class="ico">✎</span><span>Streckeneditor<small>Eigene Kurse malen und teilen</small></span></button>
         <button class="mbtn" data-act="board"><span class="ico">≡</span><span>Bestenliste<small>Rundenrekorde je Strecke</small></span></button>
@@ -448,12 +449,14 @@ function bindScreens() {
       Sound.click();
       if (act === 'quick' || act === 'trial' || act === 'champ') UI.setup(act);
       else if (act === 'career') Career.open();
+      else if (act === 'rally') Rally.ui();
       else if (act === 'fullscreen') toggleFullscreen();
       else if (act === 'editor') Editor.open();
       else if (act === 'board') UI.board();
       else if (act === 'options') UI.options();
     } else if (scr === 'scr-setup') {
       if (act === 'name') { Options.data.names[+v] = el.value.trim().slice(0, 14) || ('Spieler ' + (+v + 1)); Options.save(); return; }
+      if (UI.mode === 'rally') { Rally.uiAct(act, v, el); return; }
       UI.setupAct(act, v, el);
     } else if (scr === 'scr-options') {
       if (act === 'oname') { Options.data.names[+v] = el.value.trim().slice(0, 14) || ('Spieler ' + (+v + 1)); Options.save(); return; }
