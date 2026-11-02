@@ -14,7 +14,7 @@ function resolveWeather(wi, ti) {
 const WX_LABEL = wx => ({ clear: 'Klar', cloudy: 'Bewölkt', rain: wx.snow ? 'Schneefall' : 'Regen' }[wx.sky] + ' · ' + { day: 'Tag', dusk: 'Abend', night: 'Nacht' }[wx.time]);
 const QMODES = [['quick', 'Rennen'], ['elim', 'Ausscheidung'], ['derby', 'Derby']];
 const DERBY_TIMES = [120, 180, 300];
-const DEFAULT_RULES = { fuelOn: true, fuelPct: 100, tireOn: true, tirePct: 100, dmgOn: true, dmgPct: 100, pits: true };
+const DEFAULT_RULES = { fuelOn: true, fuelPct: 100, tireOn: true, tirePct: 100, dmgOn: true, dmgPct: 100, pits: true, powerups: false };
 const Options = {
   data: null,
   defaults() {
@@ -155,6 +155,7 @@ const UI = {
     raceCol += ruleRow('Reifenverschleiß', rules.tireOn, 'tirePct', 'tireOn');
     raceCol += ruleRow('Schadensmodell', rules.dmgOn, 'dmgPct', 'dmgOn');
     raceCol += `<div class="row"><label class="l">Boxenstopps</label>${tog('rule', rules.pits).replace('data-act="rule"', 'data-act="rule" data-v="pits"')}</div>`;
+    if (!trial) raceCol += `<div class="row"><label class="l">Power-ups</label>${tog('rule', !!rules.powerups).replace('data-act="rule"', 'data-act="rule" data-v="powerups"')}<span class="note">Nitro-Pads und ?-Kisten (Nitro, Öl, Schild)</span></div>`;
     raceCol += `<div class="note" style="margin-top:14px;line-height:1.5">Boxenstopp: in den gelben Boxenbereich fahren, anhalten, dann<br><b>Links</b> = Reparatur · <b>Unten</b> = Tanken · <b>Rechts</b> = Reifen.<br>In der Boxengasse gilt ein Tempolimit.</div>`;
     }
 
@@ -164,7 +165,7 @@ const UI = {
       const p = st.players[i];
       plCol += `<div class="prow"><div class="top"><span class="badge" style="background:${COLORS[p.color]}">P${i + 1}</span>
         <input class="name" data-act="name" data-v="${i}" value="${escapeHtml(names[i])}" maxlength="14">
-        <span class="keys">${humans === 1 && i === 0 ? 'Pfeiltasten oder WASD · Reset R · Checkpoint Leertaste' : KEYMAP[i].label + ' · Reset ' + KEYMAP[i].resetLabel + ' · Checkpoint ' + KEYMAP[i].cpLabel}</span></div>
+        <span class="keys">${humans === 1 && i === 0 ? 'Pfeiltasten oder WASD · Reset R · Checkpoint Leertaste' + (rules.powerups ? ' · Item Shift' : '') : KEYMAP[i].label + ' · Reset ' + KEYMAP[i].resetLabel + ' · Checkpoint ' + KEYMAP[i].cpLabel + (rules.powerups ? ' · Item ' + ITEM_LABELS[i] : '')}</span></div>
         <div class="row" style="margin:4px 0">${seg('cls' + i, CLASSES.map(c => c.name), p.cls).replace('class="seg"', 'class="seg small"')}</div>
         <div class="clsdesc">${CLASSES[p.cls].desc}</div>
         <div class="swatches" style="margin-top:8px">${COLORS.map((c, k) => `<span class="sw ${k === p.color ? 'on' : ''}" style="background:${c}" data-act="color${i}" data-v="${k}"></span>`).join('')}</div></div>`;

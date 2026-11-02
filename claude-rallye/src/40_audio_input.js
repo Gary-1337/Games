@@ -225,12 +225,13 @@ const Input = {
     const k = KEYMAP[p], K = this.keys;
     const T0 = this.taps;
     let up = K.has(k.up), down = K.has(k.down), left = K.has(k.left), right = K.has(k.right), reset = K.has(k.reset) || T0.has(k.reset), cpr = K.has(k.cp) || T0.has(k.cp);
-    T0.delete(k.reset); T0.delete(k.cp);
+    const ik = ITEM_KEYS[p]; let itm = K.has(ik) || T0.has(ik) || (p === 0 && (K.has('ControlRight') || T0.has('ControlRight')));
+    T0.delete(k.reset); T0.delete(k.cp); T0.delete(ik); T0.delete('ControlRight');
     if (p === 0 && this.soloWasd) {
       const w = KEYMAP[1];
-      up = up || K.has(w.up); down = down || K.has(w.down); left = left || K.has(w.left); right = right || K.has(w.right); reset = reset || K.has(w.reset) || T0.has(w.reset); cpr = cpr || K.has(w.cp) || T0.has(w.cp); T0.delete(w.reset); T0.delete(w.cp);
+      up = up || K.has(w.up); down = down || K.has(w.down); left = left || K.has(w.left); right = right || K.has(w.right); reset = reset || K.has(w.reset) || T0.has(w.reset); cpr = cpr || K.has(w.cp) || T0.has(w.cp); itm = itm || K.has('ShiftLeft') || T0.has('ShiftLeft') || K.has('KeyF') || T0.has('KeyF'); T0.delete(w.reset); T0.delete(w.cp); T0.delete('ShiftLeft'); T0.delete('KeyF');
     }
-    if (p === 0 && Touch.active) { const T = Touch.state; up = up || T.up; down = down || T.down; left = left || T.left; right = right || T.right; reset = reset || T.reset; cpr = cpr || T.cp; }
+    if (p === 0 && Touch.active) { const T = Touch.state; up = up || T.up; down = down || T.down; left = left || T.left; right = right || T.right; reset = reset || T.reset; cpr = cpr || T.cp; itm = itm || T.item; }
     let thr = up ? 1 : 0, brk = down ? 1 : 0, steer = (right ? 1 : 0) - (left ? 1 : 0);
     let pause = false;
     const pad = this.pads()[p];
@@ -246,12 +247,13 @@ const Input = {
       if (Math.abs(ax) > 0.5) { if (ax < 0) left = true; else right = true; }
       if (pr(3)) reset = true;
       if (pr(2)) cpr = true;
+      if (pr(5) || pr(4)) itm = true;
       if (pr(9) && !this.padPrevPause[p]) pause = true;
       this.padPrevPause[p] = pr(9);
     }
     const pv = this.prev[p];
-    const edge = { left: left && !pv.left, right: right && !pv.right, down: down && !pv.down, reset: reset && !pv.reset, cp: cpr && !pv.cpr };
-    this.prev[p] = { left, right, down, reset, cpr };
+    const edge = { left: left && !pv.left, right: right && !pv.right, down: down && !pv.down, reset: reset && !pv.reset, cp: cpr && !pv.cpr, item: itm && !pv.itm };
+    this.prev[p] = { left, right, down, reset, cpr, itm };
     return { thr, brk, steer, edge, pause };
   }
 };

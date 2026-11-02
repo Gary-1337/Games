@@ -51,6 +51,7 @@ function makeCar(o) {
   };
 }
 const carSpeed = c => Math.hypot(c.vx, c.vy);
+const onPitSurf = s => s === S.PIT;
 const fwdSpeed = c => c.vx * Math.cos(c.a) + c.vy * Math.sin(c.a);
 
 /** Ebene aktualisieren: Auf eine Brücke kommt man nur über ein Ende und auf Deckhöhe. */
@@ -102,10 +103,13 @@ function stepCarPhysics(car, inp, dt, race) {
   let puddle = false;
   if (rt.puddles && car.level === 0) for (const p of rt.puddles) if ((car.x - p.x) ** 2 + (car.y - p.y) ** 2 < p.r * p.r) { puddle = true; break; }
   if (puddle) gripMul *= 0.6;
+  if (car.oilT > 0) gripMul *= 0.28;
   car.puddle = puddle;
   const fuelF = (rules.fuelOn && car.fuel <= 0) ? 0.22 : 1;
   let maxV = cls.maxSpeed * speedFactor(cls, surf) * (1 - 0.35 * d) * (1 + 0.07 * (car.draft || 0));
   const onPit = surf === S.PIT;
+  const boost = car.boostT > 0 && !onPitSurf(surf) ? 1 : 0;
+  if (boost) maxV *= 1.28;
   if (onPit) maxV = Math.min(maxV, PIT_LIMIT);
   const thr = inp.thr, brk = inp.brk, steer = inp.steer;
   car.thr = thr; car.brk = brk;
@@ -140,6 +144,7 @@ function stepCarPhysics(car, inp, dt, race) {
     if (thr > 0) {
       if (vF < -5) acc += cls.brake * thr;
       else { const ratio = Math.max(0, vF) / maxV; acc += cls.accel * (1 - 0.35 * d) * fuelF * thr * Math.max(0, 1 - ratio * ratio) * traction * (1 + 0.25 * (car.draft || 0)); }
+      if (boost && vF > -5) acc += cls.accel * 0.9 * traction;
     }
     if (brk > 0) {
       if (vF > 15) acc -= cls.brake * brk * Math.min(1, 0.35 + gripMul * 0.8);
@@ -213,6 +218,7 @@ function stepCarPhysics(car, inp, dt, race) {
 /** Aufprall-Folgen: Schaden, Funken, Sound. */
 function onImpact(car, imp, x, y, race, factor = 1) {
   if (imp < 30) return;
+  if (car.shieldT > 0) factor *= 0.15;
   const rules = race.rules;
   if (rules.dmgOn && imp > 45 && !car.finished) car.damage = Math.min(100, car.damage + (imp - 45) * 0.085 * factor * car.cls.dmgMul * rules.dmgPct / 100);
   if (car.human >= 0 && imp > 260 && race.audible) Speaker.say(['Autsch!', 'Das hat gekracht!', 'Das gibt Beulen!'][Math.floor(Math.random() * 3)], 'crash', 9);

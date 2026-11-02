@@ -4,7 +4,7 @@
    Oben links: Pause, darunter Reset. Nur für Spieler 1.
    ===================================================================== */
 const Touch = {
-  active: false, el: null, state: { up: false, down: false, left: false, right: false, reset: false, cp: false }, ptr: new Map(),
+  active: false, el: null, state: { up: false, down: false, left: false, right: false, reset: false, cp: false, item: false }, ptr: new Map(),
   /** Touch-Gerät erkannt? */
   detect() { try { return (navigator.maxTouchPoints || 0) > 0 || matchMedia('(pointer: coarse)').matches; } catch (e) { return false; } },
   /** Einstellung: 0 = automatisch, 1 = immer an, 2 = aus */
@@ -13,7 +13,7 @@ const Touch = {
     const el = document.createElement('div'); el.id = 'touch';
     el.innerHTML = `<div class="tz" id="tz-steer"><div class="tb" data-k="left">◀</div><div class="tb" data-k="right">▶</div></div>
       <div class="tz" id="tz-pedal"><div class="tb" data-k="down">BREMSE<small>Box: Tanken</small></div><div class="tb gas" data-k="up">GAS</div></div>
-      <div class="tsmall" id="t-pause">Ⅱ</div><div class="tsmall" id="t-reset">↺</div><div class="tsmall" id="t-cp">⚑</div>`;
+      <div class="tsmall" id="t-pause">Ⅱ</div><div class="tsmall" id="t-reset">↺</div><div class="tsmall" id="t-cp">⚑</div><div class="tsmall" id="t-item">⚡</div>`;
     $('stage').appendChild(el); this.el = el;
     // Zonen: welcher Knopf liegt unter dem Finger? (Finger dürfen zwischen Knöpfen gleiten)
     const zoneKey = (zone, e) => {
@@ -31,6 +31,9 @@ const Touch = {
     const cpb = $('t-cp');
     cpb.addEventListener('pointerdown', e => { e.preventDefault(); this.state.cp = true; cpb.classList.add('on'); });
     for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) cpb.addEventListener(ev, () => { this.state.cp = false; cpb.classList.remove('on'); });
+    const itb = $('t-item');
+    itb.addEventListener('pointerdown', e => { e.preventDefault(); this.state.item = true; itb.classList.add('on'); });
+    for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) itb.addEventListener(ev, () => { this.state.item = false; itb.classList.remove('on'); });
     const rs = $('t-reset');
     rs.addEventListener('pointerdown', e => { e.preventDefault(); this.state.reset = true; rs.classList.add('on'); });
     for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) rs.addEventListener(ev, () => { this.state.reset = false; rs.classList.remove('on'); });
@@ -45,7 +48,7 @@ const Touch = {
     if (!this.el) return;
     const show = this.enabled() && Game.state === 'race' && !!Game.race && Game.race.cars.some(c => c.human === 0) && !Game.paused;
     if (show !== this.active) {
-      this.active = show; this.el.classList.toggle('on', show);
+      this.active = show; this.el.classList.toggle('on', show); this.el.classList.toggle('pu', show && !!Game.race.powerups);
       if (!show) { this.ptr.clear(); this.sync(); this.state.reset = false; }
     }
   }

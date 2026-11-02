@@ -112,6 +112,10 @@ function createRace(cfg) {
   R.outCount = 0;
   // Ghost laden (nur Zeitfahren)
   if (cfg.mode === 'trial') R.ghost = store.get('cr_ghost_' + src.id, null);
+  // Power-ups: nur als Regel in Rennen/Ausscheidung/Championship, nie in der Karriere
+  R.powerups = !!R.rules.powerups && !R.career && ['quick', 'elim', 'champ', 'test'].includes(cfg.mode);
+  R.pads = []; R.boxes = []; R.slicks = [];
+  if (R.powerups) PU.setup(R);
   Particles.clear();
   return R;
 }
@@ -263,6 +267,7 @@ function updateRace(race, dt) {
       if (inp.pause && race.mode !== 'demo') Game.pause();
       if (inp.edge.reset && running) { resetCar(car, race); if (race.mode === 'derby') car.damage = Math.min(99, car.damage + 8); }
       else if (inp.edge.cp && running) { resetToCheckpoint(car, race); if (race.mode === 'derby') car.damage = Math.min(99, car.damage + 8); }
+      if (inp.edge.item && running && race.powerups) PU.use(car, race);
     } else if (car.ai) inp = aiControl(car, race, dt);
     if (!running) { car.thr = inp.thr; inp = { thr: 0, brk: 0, steer: 0, edge: {} }; }
 
@@ -276,6 +281,7 @@ function updateRace(race, dt) {
     if (updateService(car, dt, race)) { car.prevX = car.x; car.prevY = car.y; car.thr = 0; continue; }
     stepCarPhysics(car, inp, dt, race);
   }
+  if (race.powerups) PU.update(race, dt);
   for (const car of race.cars) if (car.sink <= 0) collideObjects(car, race);
   collideCars(race.cars, race);
 

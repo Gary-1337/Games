@@ -115,6 +115,7 @@ function drawRace(ctx, race) {
   const L = race.layers, wx = race.weather;
   ctx.drawImage(L.scene, 0, 0, W, H);
   ctx.drawImage(race.skid, 0, 0, W, H);
+  if (race.powerups) PU.drawGround(ctx, race);
   // Autos + dynamische Objekte (Brücken, Tribünen, Flaggen) nach Tiefe
   const bridges = L.dyn.filter(o => o.t === 'bridge');
   const items = race.cars.map(c => { const v = carView(c, race); return { k: viewKey(v, bridges), car: v }; });
@@ -134,6 +135,7 @@ function drawRace(ctx, race) {
     }
   }
   ZB = 0;
+  if (race.powerups) { PU.drawBoxes(ctx, race); PU.drawCarFx(ctx, race); }
   Particles.draw(ctx);
   drawWeather(ctx, race);
   ctx.drawImage(L.overlay, 0, 0);
@@ -353,6 +355,14 @@ function drawPlayerCard(ctx, c, race, x, y, w, h) {
   ctx.fillText('P' + (c.human + 1) + '  ' + c.name.slice(0, 12), x + 12, y + 19);
   ctx.textAlign = 'right';
   if (race.mode !== 'trial') { ctx.font = '400 22px "Russo One",sans-serif'; ctx.fillStyle = c.place === 1 ? '#ffd23e' : '#fff'; ctx.fillText(c.place + '.', x + w - 10, y + 23); }
+  if (race.powerups) {
+    const it = c.item && ITEMS[c.item], bx = x + w - 66, by = y + 6;
+    ctx.fillStyle = it ? it.col : '#0d1219'; rr(ctx, bx, by, 22, 22, 5); ctx.fill();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '700 13px "Chakra Petch",sans-serif'; ctx.fillStyle = it ? '#0d1219' : '#3a4558';
+    ctx.fillText(it ? it.ico : '·', bx + 11, by + 12);
+    if (c.boostT > 0) { ctx.fillStyle = '#38c4ff'; ctx.fillRect(bx - 26, by + 9, 20 * clamp(c.boostT / BOOST_T.nitro, 0, 1), 4); }
+    ctx.textAlign = 'right'; ctx.textBaseline = 'alphabetic';
+  }
   ctx.textAlign = 'left'; ctx.font = '500 11px "Chakra Petch",sans-serif'; ctx.fillStyle = '#8a97ad';
   if (race.mode === 'derby') {
     ctx.fillText(c.wreck ? 'Wrack – ausgeschieden' : c.finished ? 'Letztes fahrbereites Auto!' : 'Rammen mit der Front schont dein Auto', x + 12, y + 33);
