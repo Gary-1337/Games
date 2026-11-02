@@ -1,6 +1,6 @@
 # Treppen-Chaos 3D – Versionsverlauf
 
-Eigenständiges Spiel neben der 2D-Version (`treppen-chaos/`).
+Ragdoll-Treppensturz in 3D.
 Die aktuelle Version liegt immer in `index.html`. Jede Version liegt zusätzlich unverändert unter `versions/index-vX.Y.Z.html`.
 **Rollback:** gewünschte Datei aus `versions/` nehmen und als `index.html` verwenden (oder direkt öffnen). Die Versionsnummer steht unten im Hauptmenü.
 

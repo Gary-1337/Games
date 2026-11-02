@@ -7,7 +7,6 @@ Browserspiele, jeweils eine einzelne HTML-Datei ohne Build-Werkzeuge (außer Cla
 | `claude-rallye/` | Claude Rallye – Top-Down-Arcade-Rennspiel | 1.7.0-beta3 |
 | `alpine-ski-jump-deluxe/` | Alpine Ski Jump Deluxe – Skispringen | 1.12.0 |
 | `die-claudler/` | Die Claudler – Aufbau- und Wirtschaftssimulation | 2.6.0 |
-| `treppen-chaos/` | Treppen-Chaos – Ragdoll Dismount (2D) | 1.0.0 |
 | `treppen-chaos-3d/` | Treppen-Chaos 3D | 1.3.0 |
 
 `index.html` im Hauptordner ist die Startseite mit Links zu allen Spielen.
