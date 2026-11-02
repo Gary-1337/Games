@@ -170,6 +170,8 @@ function drawRace(ctx, race) {
     ctx.strokeStyle = '#ffcd32'; ctx.lineWidth = 5; ctx.setLineDash([10, 6]);
     ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke(); ctx.restore();
     label(ctx, (A[0] + B[0]) / 2, (A[1] + B[1]) / 2 - 14, 'CHECKPOINT ' + c.nextCp, 'rgba(0,0,0,.75)', '#ffcd32', 10);
+    const [cx, cy] = map(...P(c.x, c.y, c.z + 16));
+    label(ctx, cx, cy - 40, 'CHECKPOINT VERPASST · Reset in ' + Math.max(1, Math.ceil(5 - (c.missedT || 0))) + ' s', 'rgba(200,120,0,.92)', '#fff', 12);
   }
   // Ausscheidungsrennen: aktuell Letzten markieren
   if (race.mode === 'elim' && race.state === 'running') {

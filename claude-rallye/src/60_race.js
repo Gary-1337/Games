@@ -318,7 +318,17 @@ function updateRace(race, dt) {
       const f = car.s / rt.L, cf = rt.cps[car.nextCp].frac;
       const was = car.missedCp; car.missedCp = f > cf + 0.035 && f < cf + 0.5;
       if (car.missedCp && !was) { flashMsg(car, 'CHECKPOINT VERPASST – zurück!', '#ffcd32'); if (race.audible) Sound.beep(330, 0.25, 'square', 0.12); }
-    } else car.missedCp = false;
+      // Nach 5 s automatisch vor den verpassten Checkpoint zurücksetzen
+      if (car.missedCp && car.freeze <= 0 && car.sink <= 0) {
+        const before = car.missedT || 0; car.missedT = before + dt;
+        if (race.audible && Math.ceil(5 - car.missedT) < Math.ceil(5 - before) && car.missedT < 5) Sound.beep(520, 0.07, 'triangle', 0.07);
+        if (car.missedT >= 5) {
+          const k = car.nextCp; car.missedT = 0; car.missedCp = false;
+          resetCar(car, race, rt.cps[k].frac * rt.L - 45);
+          flashMsg(car, 'Zurück vor Checkpoint ' + k, '#8fd8ff');
+        }
+      } else if (!car.missedCp) car.missedT = 0;
+    } else { car.missedCp = false; car.missedT = 0; }
     if (car.resetMsg > 0) car.resetMsg -= dt;
     if (car.msgT > 0) car.msgT -= dt;
     // Ghost-Aufzeichnung (30 Bilder/s)

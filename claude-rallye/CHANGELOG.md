@@ -4,6 +4,10 @@ Top-Down-Arcade-Rennspiel in einer einzigen Datei (HTML5 + Canvas + JavaScript).
 Die aktuelle Version liegt immer in `index.html`. Die Versionsnummer steht unten rechts im Hauptmenü.
 Unter `versions/` liegen höchstens 3 Versionsstände, ältere werden gelöscht (sie bleiben in der Git-Historie abrufbar). **Rollback:** gewünschte Datei aus `versions/` als `index.html` verwenden. Alle Änderungen sind hier dokumentiert.
 
+## 1.7.2 (02.11.2026)
+- **Verpasster Checkpoint:** Fährt man an einem Checkpoint vorbei, läuft ein 5-Sekunden-Countdown („CHECKPOINT VERPASST · Reset in … s“ über dem Auto, leiser Piepton je Sekunde). Fährt man nicht zurück, wird das Auto danach automatisch kurz **vor** den verpassten Checkpoint gesetzt. Gilt in allen Modi mit Checkpoints, auch in Rallye-Etappen.
+- Neuer Test `tests/missedcp.py`.
+
 ## 1.7.1 (02.11.2026)
 - **Schärfere Grafik, vor allem im Zoom:** Die Zeichenfläche wird jetzt in der tatsächlichen Bildschirmauflösung gerendert (Fenstergröße × Pixeldichte, bis 3-fach) statt mit fester Größe hochskaliert. Die Strecke wird passend dazu in bis zu 3-facher Auflösung vorberechnet (vorher fest 2-fach, ohne Zoom 1-fach). Auf Handys und Tablets höchstens 2-fach, damit es flüssig bleibt.
 - Ändert sich die Fenstergröße oder die Zoomstufe (Taste C), wird die Strecke bei Bedarf schärfer neu aufgebaut; auch in Rallye-Etappen beim Abschnittswechsel.
