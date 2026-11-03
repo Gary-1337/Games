@@ -1,9 +1,9 @@
 // @ts-check
 // Kopfzeile (Spieler, Gruppen, Fouls, Kugelchips), Meldungen, Kraft- und Spin-Anzeige.
-import { $, h } from './dom.js';
-import { GROUP_NAME, SOLIDS, STRIPES } from '../game/rules.js';
-import { ballColor } from '../render/textures.js';
-import { CPU_LEVELS } from '../game/cpu.js';
+import { $, h } from './dom.js?v=1.0.1';
+import { GROUP_NAME, SOLIDS, STRIPES } from '../game/rules.js?v=1.0.1';
+import { ballColor } from '../render/textures.js?v=1.0.1';
+import { CPU_LEVELS } from '../game/cpu.js?v=1.0.1';
 
 export class Hud {
   constructor() {

@@ -113,3 +113,13 @@ die Gleitreibung krümmt die Bahn.
 - 16 Kugeln: paarweise Prüfung (120 Paare) ist billiger als Spatial Partitioning; ruhende Paare werden übersprungen.
 - Physik/Loop pausieren bei `visibilitychange`; Resize/Orientierungswechsel über `ResizeObserver`.
 - Fallback-Bildschirm, wenn WebGL fehlt oder die 3D-Bibliothek nicht lädt.
+
+## Neue Version veröffentlichen
+
+Alle Modul-Pfade tragen die Version als Query (`?v=1.0.1`), damit Browser nach einem Update nie alte und
+neue Dateien mischen (GitHub Pages cacht 10 Minuten). Beim Release die Version überall ersetzen,
+auch `VERSION` in `src/ui/dialogs.js`:
+
+```bash
+grep -rl "1\.0\.1" index.html src vendor | xargs sed -i "s/1\.0\.1/1.0.2/g"
+```

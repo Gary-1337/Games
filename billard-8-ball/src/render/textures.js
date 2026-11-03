@@ -1,6 +1,6 @@
 // @ts-check
 // Prozedurale Texturen (keine Bilddateien → schneller Start).
-import * as THREE from '../../vendor/three.module.js';
+import * as THREE from '../../vendor/three.module.js?v=1.0.1';
 
 export const BALL_COLORS = {
   1: '#f2be1a', 2: '#1747a6', 3: '#d42a2a', 4: '#5a2c8c', 5: '#f07a18', 6: '#127a3c', 7: '#80231f', 8: '#111111',

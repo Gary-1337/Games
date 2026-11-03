@@ -10,6 +10,7 @@ Die Versionsnummer steht unten im Hauptmenü.
 - Three.js wird jetzt mitgeliefert (`vendor/`) statt per Import-Map vom CDN geladen; kein Top-Level-await mehr
 - Startwächter: Schlägt das Laden fehl, erscheint eine Fehlermeldung mit Details und „Neu laden“
 - Musik standardmäßig halb so laut
+- Modul-URLs tragen die Version (`?v=1.0.1`), damit nach Updates keine alten Dateien aus dem Browser-Cache dazwischenfunken
 
 ## 1.0.0 (03.11.2026)
 - Pool-Billard (8-Ball) in 3D mit Three.js, optimiert fürs Hochformat

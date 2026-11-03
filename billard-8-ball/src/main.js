@@ -2,23 +2,23 @@
 // Einstiegspunkt: Spielzustand, Game-Loop (Fixed-Timestep + Interpolation) und Verdrahtung
 // von Physik, Regeln, CPU, Rendering, Eingabe, UI und Audio.
 
-import { Simulation } from './physics/simulation.js';
-import { DT } from './physics/constants.js';
-import { shotToStrike } from './physics/cue.js';
-import { castCueBall } from './physics/raycast.js';
-import { createRng } from './physics/rng.js';
-import { setupRack } from './game/rack.js';
-import { createMatch, evaluateShot, applyOutcome, legalTargets, FOUL_TEXT, GROUP_LONG } from './game/rules.js';
-import { planCpuShot, objectBallsOnTable } from './game/cpu.js';
-import { Hud } from './ui/hud.js';
-import { Dialogs } from './ui/dialogs.js';
-import { loadSettings, saveSettings, loadGame, saveGame, clearGame } from './ui/settings.js';
-import { $, h } from './ui/dom.js';
-import { Sound } from './audio/sound.js';
-import { AimPad } from './input/aimPad.js';
-import { SpinControl } from './input/spinControl.js';
-import { CameraGestures } from './input/cameraGestures.js';
-import { GameRenderer } from './render/renderer.js';
+import { Simulation } from './physics/simulation.js?v=1.0.1';
+import { DT } from './physics/constants.js?v=1.0.1';
+import { shotToStrike } from './physics/cue.js?v=1.0.1';
+import { castCueBall } from './physics/raycast.js?v=1.0.1';
+import { createRng } from './physics/rng.js?v=1.0.1';
+import { setupRack } from './game/rack.js?v=1.0.1';
+import { createMatch, evaluateShot, applyOutcome, legalTargets, FOUL_TEXT, GROUP_LONG } from './game/rules.js?v=1.0.1';
+import { planCpuShot, objectBallsOnTable } from './game/cpu.js?v=1.0.1';
+import { Hud } from './ui/hud.js?v=1.0.1';
+import { Dialogs } from './ui/dialogs.js?v=1.0.1';
+import { loadSettings, saveSettings, loadGame, saveGame, clearGame } from './ui/settings.js?v=1.0.1';
+import { $, h } from './ui/dom.js?v=1.0.1';
+import { Sound } from './audio/sound.js?v=1.0.1';
+import { AimPad } from './input/aimPad.js?v=1.0.1';
+import { SpinControl } from './input/spinControl.js?v=1.0.1';
+import { CameraGestures } from './input/cameraGestures.js?v=1.0.1';
+import { GameRenderer } from './render/renderer.js?v=1.0.1';
 
 /** @typedef {'menu'|'aim'|'cpu'|'strike'|'roll'|'handover'|'replay'|'over'} State */
 

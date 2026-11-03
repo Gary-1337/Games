@@ -1,6 +1,6 @@
 // @ts-check
 // Zielhilfe, Ball-in-Hand-Markierung, Zielkugel-Ringe und Pfeil des letzten Stoßes.
-import * as THREE from '../../vendor/three.module.js';
+import * as THREE from '../../vendor/three.module.js?v=1.0.1';
 
 const H = 0.0015;
 
