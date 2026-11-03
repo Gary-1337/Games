@@ -1,6 +1,6 @@
 // @ts-check
 // Queue: Spitze sitzt am gewählten Trefferpunkt, Neigung = Queue-Winkel, Rückzug = Kraft.
-import * as THREE from 'three';
+import * as THREE from '../../vendor/three.module.js';
 import { RAIL_TOP } from './tableMesh.js';
 
 const BASE_TILT = 0.035; // leicht angehobener Griff, wie beim echten Stoß

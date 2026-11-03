@@ -18,6 +18,7 @@ import { Sound } from './audio/sound.js';
 import { AimPad } from './input/aimPad.js';
 import { SpinControl } from './input/spinControl.js';
 import { CameraGestures } from './input/cameraGestures.js';
+import { GameRenderer } from './render/renderer.js';
 
 /** @typedef {'menu'|'aim'|'cpu'|'strike'|'roll'|'handover'|'replay'|'over'} State */
 
@@ -40,14 +41,6 @@ if (!webglAvailable()) {
   throw new Error('WebGL nicht verfügbar');
 }
 
-/** @type {typeof import('./render/renderer.js').GameRenderer} */
-let GameRenderer;
-try {
-  ({ GameRenderer } = await import('./render/renderer.js'));
-} catch (e) {
-  fatal('Laden fehlgeschlagen', 'Die 3D-Bibliothek konnte nicht geladen werden. Bitte prüfe die Internetverbindung und lade die Seite neu.');
-  throw e;
-}
 
 const settings = loadSettings();
 const hud = new Hud();
@@ -855,6 +848,7 @@ setupRack(sim, rng);
 rig.reset(true);
 refreshHud();
 startLoop();
+/** @type {any} */ (window).__billardReady = true;
 $('#boot').classList.add('gone');
 setTimeout(() => $('#boot')?.remove(), 400);
 showMenu();

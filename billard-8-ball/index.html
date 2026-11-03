@@ -9,14 +9,42 @@
 <meta name="description" content="3D-Pool-Billard (8-Ball) im Browser – gegen die CPU, zu zweit an einem Gerät oder im Übungsmodus.">
 <title>Billard 8-Ball</title>
 <link rel="stylesheet" href="src/ui/styles.css">
-<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" crossorigin>
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+<link rel="modulepreload" href="vendor/three.module.js">
+<script>
+// Startwächter (klassisches Skript, läuft auch dort, wo ES-Module scheitern):
+// zeigt eine Fehlermeldung statt endlos „Lade Billard…“.
+(function () {
+  var errors = [];
+  function show(title, text) {
+    if (window.__billardReady) return;
+    var boot = document.getElementById('boot');
+    if (!boot) return;
+    boot.innerHTML = '';
+    var h = document.createElement('h1'); h.textContent = title;
+    var p = document.createElement('p'); p.textContent = text;
+    var b = document.createElement('button'); b.className = 'btn primary'; b.textContent = 'Neu laden';
+    b.onclick = function () { location.reload(); };
+    var d = document.createElement('p'); d.className = 'boot-detail';
+    d.textContent = 'Details: ' + (errors.length ? errors.join(' | ') : 'keine Fehlermeldung') + ' · ' + navigator.userAgent;
+    boot.appendChild(h); boot.appendChild(p); boot.appendChild(b); boot.appendChild(d);
   }
-}
+  window.addEventListener('error', function (e) {
+    var t = e.target;
+    errors.push(e.message || (t && (t.src || t.href) ? 'Datei nicht geladen: ' + (t.src || t.href) : 'Ladefehler'));
+    setTimeout(function () { show('Das Spiel konnte nicht starten', 'Beim Laden ist ein Fehler aufgetreten. Bitte neu laden; hilft das nicht, Browser aktualisieren.'); }, 300);
+  }, true);
+  window.addEventListener('unhandledrejection', function (e) {
+    errors.push(String(e.reason && e.reason.message ? e.reason.message : e.reason));
+  });
+  document.addEventListener('DOMContentLoaded', function () {
+    if (!('noModule' in HTMLScriptElement.prototype)) {
+      show('Browser zu alt', 'Dieser Browser unterstützt keine JavaScript-Module. Bitte Chrome, Firefox, Samsung Internet oder Safari aktualisieren.');
+    }
+  });
+  setTimeout(function () {
+    show('Das Spiel startet nicht', errors.length ? 'Beim Laden ist ein Fehler aufgetreten.' : 'Das Laden dauert ungewöhnlich lange. Bitte Internetverbindung prüfen und neu laden.');
+  }, 20000);
+})();
 </script>
 </head>
 <body>

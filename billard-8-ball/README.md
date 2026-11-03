@@ -5,8 +5,8 @@ Drei Modi: **gegen die CPU** (Leicht/Mittel/Schwer), **2 Spieler an einem Gerät
 
 ## Start
 
-Das Projekt hat **keinen Build-Schritt**: native ES-Module, Three.js kommt per Import-Map vom CDN
-(`three@0.160.0` von jsDelivr). Es muss nur über HTTP ausgeliefert werden (ES-Module laufen nicht über `file://`).
+Das Projekt hat **keinen Build-Schritt**: native ES-Module, Three.js (`three@0.160.0`) liegt mitgeliefert in `vendor/`
+(kein CDN, keine Import-Map). Es muss nur über HTTP ausgeliefert werden (ES-Module laufen nicht über `file://`).
 
 ```bash
 # Windows ohne Node/Python – mitgelieferter Mini-Server:
@@ -23,7 +23,7 @@ Dann `http://localhost:8080/` öffnen. Für das Handy den Ordner auf einen belie
 ## Architektur
 
 ```
-index.html            Layout (HUD oben, Tisch Mitte, Steuerzone unten), Import-Map
+index.html            Layout (HUD oben, Tisch Mitte, Steuerzone unten), Startwächter mit Fehleranzeige
 src/main.js           Zustandsautomat + Game-Loop (Fixed-Timestep, Interpolation), Verdrahtung
 src/physics/          reine, deterministische Simulation – kein Three.js, kein DOM
   constants.js        Kugel-/Tischmaße, Physik-Parameter
@@ -105,7 +105,7 @@ die Gleitreibung krümmt die Bahn.
 
 ## Mobile-Performance
 
-- Keine Bild- oder Audiodateien: Texturen werden per Canvas, Sounds per WebAudio erzeugt → nur Three.js
+- Keine Bild- oder Audiodateien: Texturen werden per Canvas, Sounds per WebAudio erzeugt → nur das mitgelieferte Three.js
   (~170 kB gzip) wird geladen.
 - `devicePixelRatio` wird begrenzt (Hoch 2, Mittel 1,5, Niedrig 1). Im Modus **Auto** misst das Spiel die
   Frame-Zeit und senkt die Renderauflösung dynamisch (und schaltet die Umgebungsreflexion ab), falls < 50 FPS.

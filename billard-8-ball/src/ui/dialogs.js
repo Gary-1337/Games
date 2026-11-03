@@ -3,7 +3,7 @@
 import { $, h } from './dom.js';
 import { CPU_LEVELS } from '../game/cpu.js';
 
-export const VERSION = '1.0.0';
+export const VERSION = '1.0.1';
 
 const root = () => $('#modal-root');
 

@@ -1,6 +1,6 @@
 // @ts-check
 // Orbit-Kamera um einen Zielpunkt auf dem Tisch, mit weicher Nachführung.
-import * as THREE from 'three';
+import * as THREE from '../../vendor/three.module.js';
 
 const DEG = Math.PI / 180;
 const HALF_X = 1.46, HALF_Y = 0.83; // Tisch inkl. Rahmen

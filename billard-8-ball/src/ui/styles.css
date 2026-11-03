@@ -189,6 +189,11 @@ body.lefty .ctrl-main { flex-direction: row-reverse; }
 .tut-highlight { outline: 3px solid var(--focus) !important; outline-offset: 2px; position: relative; z-index: 24; }
 
 .boot { position: fixed; inset: 0; display: grid; place-content: center; justify-items: center; gap: 12px; background: var(--bg); z-index: 50; color: var(--ink-soft); }
+.boot { padding: 24px; text-align: center; }
+.boot h1 { margin: 0; font-size: 21px; color: var(--ink); }
+.boot p { margin: 0; max-width: 420px; line-height: 1.45; }
+.boot .btn { max-width: 260px; }
+.boot .boot-detail { font-size: 11px; opacity: .7; word-break: break-word; -webkit-user-select: text; user-select: text; }
 .boot.gone { opacity: 0; pointer-events: none; transition: opacity .3s; }
 .boot-ball { width: 46px; height: 46px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #ddd 50%, #999); animation: roll 1s linear infinite; }
 @keyframes roll { to { transform: translateX(16px) rotate(360deg); } }

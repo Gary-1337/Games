@@ -5,6 +5,12 @@ Die aktuelle Version liegt immer in `index.html`, die Quellen in `src/` (ES-Modu
 Die Versionsnummer steht unten im Hauptmenü.
 **Rollback:** älteren Stand mit `git checkout <commit> -- billard-8-ball` zurückholen.
 
+## 1.0.1 (03.11.2026)
+- Start auf Android repariert: Das Spiel blieb bei „Lade Billard…“ stehen
+- Three.js wird jetzt mitgeliefert (`vendor/`) statt per Import-Map vom CDN geladen; kein Top-Level-await mehr
+- Startwächter: Schlägt das Laden fehl, erscheint eine Fehlermeldung mit Details und „Neu laden“
+- Musik standardmäßig halb so laut
+
 ## 1.0.0 (03.11.2026)
 - Pool-Billard (8-Ball) in 3D mit Three.js, optimiert fürs Hochformat
 - Eigene deterministische Physik: Sliding/Rolling, Follow, Draw, Effet, Squirt, Massé, Throw, Banden mit Spin

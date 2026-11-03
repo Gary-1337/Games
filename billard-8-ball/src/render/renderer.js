@@ -1,7 +1,7 @@
 // @ts-check
 // Three.js-Szene: Tisch, Kugeln, Queue, Overlays, Licht, adaptive Qualität.
-import * as THREE from 'three';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import * as THREE from '../../vendor/three.module.js';
+import { RoomEnvironment } from '../../vendor/RoomEnvironment.js';
 import { buildTable } from './tableMesh.js';
 import { makeBallTexture, makeBlobTexture, makeLabelTexture } from './textures.js';
 import { CameraRig } from './camera.js';
