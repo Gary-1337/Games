@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Billard Tests</title>
+<style>
+  body { font: 15px/1.5 system-ui, sans-serif; background: #111418; color: #e8edf2; margin: 0; padding: 16px; }
+  h1 { font-size: 20px; }
+  li { margin: 6px 0; }
+  .ok { color: #6fdc8c; } .fail { color: #ff7a7a; }
+  .err { display: block; color: #ffb3b3; font-size: 13px; margin-left: 1.4em; }
+</style>
+</head>
+<body>
+<h1>Billard – Unit-Tests</h1>
+<p id="summary">Läuft…</p>
+<ul id="list"></ul>
+<script type="module">
+  import { runAll } from './harness.js';
+  import './physics.test.js';
+  import './rules.test.js';
+  const results = await runAll();
+  const list = document.getElementById('list');
+  for (const r of results) {
+    const li = document.createElement('li');
+    li.className = r.ok ? 'ok' : 'fail';
+    li.textContent = `${r.ok ? '✔' : '✘'} ${r.name} (${r.ms.toFixed(0)} ms)`;
+    if (!r.ok) { const e = document.createElement('span'); e.className = 'err'; e.textContent = r.error; li.append(e); }
+    list.append(li);
+  }
+  const failed = results.filter((r) => !r.ok).length;
+  document.getElementById('summary').textContent = `${results.length - failed}/${results.length} bestanden`;
+  window.__testResults = results;
+</script>
+</body>
+</html>

@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0b0e12">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="description" content="3D-Pool-Billard (8-Ball) im Browser – gegen die CPU, zu zweit an einem Gerät oder im Übungsmodus.">
+<title>Billard 8-Ball</title>
+<link rel="stylesheet" href="src/ui/styles.css">
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" crossorigin>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="app">
+  <header id="hud">
+    <div class="players">
+      <section class="player" id="p0" aria-live="polite">
+        <div class="pname"></div>
+        <div class="pmeta"><span class="pgroup"></span><span class="pleft"></span><span class="pfouls"></span></div>
+        <span class="turn-badge">▶ am Zug</span>
+      </section>
+      <section class="player" id="p1" aria-live="polite">
+        <div class="pname"></div>
+        <div class="pmeta"><span class="pgroup"></span><span class="pleft"></span><span class="pfouls"></span></div>
+        <span class="turn-badge">▶ am Zug</span>
+      </section>
+    </div>
+    <div id="chips" aria-label="Kugeln auf dem Tisch"></div>
+  </header>
+
+  <main id="stage">
+    <canvas id="gl" aria-label="Billardtisch"></canvas>
+    <div class="stage-left">
+      <button class="icon-btn" id="btn-pause" aria-label="Pause / Menü">❚❚</button>
+      <button class="icon-btn" id="btn-help" aria-label="Regeln und Hilfe">?</button>
+    </div>
+    <div class="stage-right">
+      <button class="icon-btn" id="btn-top" aria-label="Vogelperspektive">Top</button>
+      <button class="icon-btn" id="btn-cam" aria-label="Kamera zurücksetzen">⟲</button>
+      <button class="icon-btn" id="btn-replay" aria-label="Letzten Stoß wiederholen">↺▶</button>
+    </div>
+    <div id="toasts" aria-live="assertive"></div>
+    <div id="status-pill" hidden></div>
+    <button id="btn-skip" class="pill-btn" hidden>⏩ Überspringen</button>
+  </main>
+
+  <footer id="controls">
+    <div class="ctrl-row">
+      <button class="ctl-btn" id="btn-fine" aria-pressed="false">Feinziel</button>
+      <button class="ctl-btn" id="btn-mode">↕ Kraft</button>
+      <button class="ctl-btn" id="btn-undo">Undo</button>
+      <button class="ctl-btn" id="btn-rerack" hidden aria-label="Kugeln neu aufbauen">↻ Rack</button>
+      <button class="ctl-btn" id="btn-sound" aria-label="Sound an/aus" title="Sound an/aus">🔊</button>
+    </div>
+    <div class="ctrl-main">
+      <div id="aim-pad" role="slider" aria-label="Zielen und Kraft" tabindex="0">
+        <div class="pad-hint"><span>◀ wischen = zielen ▶</span><span id="pad-vhint">▼ ziehen = Kraft · loslassen = Stoß</span></div>
+        <div class="power-wrap">
+          <div class="power-bar"><div class="power-fill" id="power-fill"></div></div>
+          <div class="power-val" id="power-val">0 %</div>
+        </div>
+      </div>
+      <div id="spin">
+        <div class="spin-ball" id="spin-ball" tabindex="0" role="slider" aria-label="Trefferpunkt auf der Spielkugel">
+          <div class="spin-safe"></div>
+          <div class="spin-cross"></div>
+          <div class="spin-dot" id="spin-dot"></div>
+        </div>
+        <div class="spin-label" id="spin-label">Mitte</div>
+        <div class="spin-label dim" id="elev-label">Queue 0°</div>
+      </div>
+    </div>
+  </footer>
+</div>
+<div id="modal-root"></div>
+<div id="boot" class="boot"><div class="boot-ball"></div><p>Lade Billard…</p></div>
+<noscript><p class="fatal">Dieses Spiel benötigt JavaScript.</p></noscript>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
