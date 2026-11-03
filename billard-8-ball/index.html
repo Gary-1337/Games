@@ -8,24 +8,42 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="description" content="3D-Pool-Billard (8-Ball) im Browser – gegen die CPU, zu zweit an einem Gerät oder im Übungsmodus.">
 <title>Billard 8-Ball</title>
-<link rel="stylesheet" href="src/ui/styles.css?v=1.0.1">
-<link rel="modulepreload" href="vendor/three.module.js?v=1.0.1">
+<link rel="stylesheet" href="src/ui/styles.css?v=1.0.2">
+<link rel="modulepreload" href="vendor/three.module.js?v=1.0.2">
 <script>
 // Startwächter (klassisches Skript, läuft auch dort, wo ES-Module scheitern):
 // zeigt eine Fehlermeldung statt endlos „Lade Billard…“.
 (function () {
+  var VERSION = '1.0.2';
+  var MODULES = 27; // JavaScript-Dateien in src/ und vendor/
   var errors = [];
+  var failed = false;
+  function loadedModules() {
+    if (!window.performance || !performance.getEntriesByType) return '?';
+    return performance.getEntriesByType('resource').filter(function (r) { return /\.js(\?|$)/.test(r.name); }).length;
+  }
+  // Fortschritt: vor dem Modulstart zählen wir geladene Dateien, danach meldet main.js die Phase
+  function stage() {
+    return window.__bootStage || ('Dateien ' + loadedModules() + '/' + MODULES + ' geladen');
+  }
+  var poll = setInterval(function () {
+    var s = document.getElementById('boot-status');
+    if (window.__billardReady || failed || !s) { if (window.__billardReady || failed) clearInterval(poll); return; }
+    s.textContent = 'v' + VERSION + ' · ' + stage();
+  }, 300);
   function show(title, text) {
-    if (window.__billardReady) return;
+    if (window.__billardReady || failed) return;
+    failed = true;
     var boot = document.getElementById('boot');
     if (!boot) return;
+    var where = stage();
     boot.innerHTML = '';
     var h = document.createElement('h1'); h.textContent = title;
     var p = document.createElement('p'); p.textContent = text;
     var b = document.createElement('button'); b.className = 'btn primary'; b.textContent = 'Neu laden';
     b.onclick = function () { location.reload(); };
     var d = document.createElement('p'); d.className = 'boot-detail';
-    d.textContent = 'Details: ' + (errors.length ? errors.join(' | ') : 'keine Fehlermeldung') + ' · ' + navigator.userAgent;
+    d.textContent = 'v' + VERSION + ' · hängt bei: ' + where + ' · Fehler: ' + (errors.length ? errors.join(' | ') : 'keine') + ' · ' + navigator.userAgent;
     boot.appendChild(h); boot.appendChild(p); boot.appendChild(b); boot.appendChild(d);
   }
   window.addEventListener('error', function (e) {
@@ -43,7 +61,7 @@
   });
   setTimeout(function () {
     show('Das Spiel startet nicht', errors.length ? 'Beim Laden ist ein Fehler aufgetreten.' : 'Das Laden dauert ungewöhnlich lange. Bitte Internetverbindung prüfen und neu laden.');
-  }, 20000);
+  }, 12000);
 })();
 </script>
 </head>
@@ -110,8 +128,8 @@
   </footer>
 </div>
 <div id="modal-root"></div>
-<div id="boot" class="boot"><div class="boot-ball"></div><p>Lade Billard…</p></div>
+<div id="boot" class="boot"><div class="boot-ball"></div><p>Lade Billard…</p><p class="boot-detail" id="boot-status">v1.0.2</p></div>
 <noscript><p class="fatal">Dieses Spiel benötigt JavaScript.</p></noscript>
-<script type="module" src="src/main.js?v=1.0.1"></script>
+<script type="module" src="src/main.js?v=1.0.2"></script>
 </body>
 </html>

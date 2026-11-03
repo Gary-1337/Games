@@ -1,9 +1,9 @@
 // @ts-check
 // Menüs und Dialoge. Modal nur bei Menü, Pause, Spielende und Spielerübergabe (Kugeln ruhen dann).
-import { $, h } from './dom.js?v=1.0.1';
-import { CPU_LEVELS } from '../game/cpu.js?v=1.0.1';
+import { $, h } from './dom.js?v=1.0.2';
+import { CPU_LEVELS } from '../game/cpu.js?v=1.0.2';
 
-export const VERSION = '1.0.1';
+export const VERSION = '1.0.2';
 
 const root = () => $('#modal-root');
 

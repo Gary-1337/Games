@@ -1,6 +1,6 @@
 // @ts-check
 // Synthetische Sounds über WebAudio (keine Downloads, sofort verfügbar).
-import { BarMusic } from './music.js?v=1.0.1';
+import { BarMusic } from './music.js?v=1.0.2';
 
 export class Sound {
   constructor() {

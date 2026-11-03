@@ -3,10 +3,10 @@
 // Schwer simuliert zusätzlich eine stark begrenzte Anzahl Kandidaten-Stöße (≤ 24), um Positionsspiel,
 // Spin und Safeties zu bewerten. Die Ausführung ist in allen Stufen mit Streuung versehen.
 
-import { castCueBall, corridorClear } from '../physics/raycast.js?v=1.0.1';
-import { speedToPower, shotToStrike } from '../physics/cue.js?v=1.0.1';
-import { gaussian } from '../physics/rng.js?v=1.0.1';
-import { legalTargets, evaluateShot, applyOutcome } from './rules.js?v=1.0.1';
+import { castCueBall, corridorClear } from '../physics/raycast.js?v=1.0.2';
+import { speedToPower, shotToStrike } from '../physics/cue.js?v=1.0.2';
+import { gaussian } from '../physics/rng.js?v=1.0.2';
+import { legalTargets, evaluateShot, applyOutcome } from './rules.js?v=1.0.2';
 
 export const CPU_LEVELS = {
   easy: { label: 'Leicht', aimSigma: 0.02, powerSigma: 0.16, pickTop: 3, blunder: 0.12, spin: false, sims: 0 },

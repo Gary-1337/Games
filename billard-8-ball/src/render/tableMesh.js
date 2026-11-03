@@ -1,8 +1,8 @@
 // @ts-check
 // Baut den Tisch (Filz, Banden, Holzrahmen, Taschen, Diamanten) aus der Physik-Geometrie.
 // Physik (x, y) → Three (x, -y) über Shape-Rotation um -90° um die x-Achse.
-import * as THREE from '../../vendor/three.module.js?v=1.0.1';
-import { makeFeltTexture, makeWoodTexture } from './textures.js?v=1.0.1';
+import * as THREE from '../../vendor/three.module.js?v=1.0.2';
+import { makeFeltTexture, makeWoodTexture } from './textures.js?v=1.0.2';
 
 const RAIL_OUT = 0.13; // Holzrahmen außerhalb der Banden
 const CUSHION_H = 0.042;

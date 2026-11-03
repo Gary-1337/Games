@@ -8,7 +8,7 @@ Browserspiele, jeweils eine einzelne HTML-Datei ohne Build-Werkzeuge (außer Cla
 | `alpine-ski-jump-deluxe/` | Alpine Ski Jump Deluxe – Skispringen | 1.12.0 |
 | `die-claudler/` | Die Claudler – Aufbau- und Wirtschaftssimulation | 2.6.0 |
 | `treppen-chaos-3d/` | Treppen-Chaos 3D | 1.3.0 |
-| `billard-8-ball/` | Billard 8-Ball – 3D-Pool-Billard | 1.0.1 |
+| `billard-8-ball/` | Billard 8-Ball – 3D-Pool-Billard | 1.0.2 |
 
 `index.html` im Hauptordner ist die Startseite mit Links zu allen Spielen.
 

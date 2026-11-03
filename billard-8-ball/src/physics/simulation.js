@@ -15,8 +15,8 @@
 //  - Banden: Kontakt an der Bandennase oberhalb des Kugelzentrums; Restitution + Reibung,
 //    dadurch verändert Side-Spin den Abprallwinkel und Topspin wird teilweise abgebaut.
 
-import { BALL_RADIUS, BALL_MASS, GRAVITY, DT, DEFAULT_PARAMS, BALL_COUNT } from './constants.js?v=1.0.1';
-import { createTable } from './table.js?v=1.0.1';
+import { BALL_RADIUS, BALL_MASS, GRAVITY, DT, DEFAULT_PARAMS, BALL_COUNT } from './constants.js?v=1.0.2';
+import { createTable } from './table.js?v=1.0.2';
 
 /**
  * @typedef {Object} Ball

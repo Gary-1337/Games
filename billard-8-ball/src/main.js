@@ -2,23 +2,23 @@
 // Einstiegspunkt: Spielzustand, Game-Loop (Fixed-Timestep + Interpolation) und Verdrahtung
 // von Physik, Regeln, CPU, Rendering, Eingabe, UI und Audio.
 
-import { Simulation } from './physics/simulation.js?v=1.0.1';
-import { DT } from './physics/constants.js?v=1.0.1';
-import { shotToStrike } from './physics/cue.js?v=1.0.1';
-import { castCueBall } from './physics/raycast.js?v=1.0.1';
-import { createRng } from './physics/rng.js?v=1.0.1';
-import { setupRack } from './game/rack.js?v=1.0.1';
-import { createMatch, evaluateShot, applyOutcome, legalTargets, FOUL_TEXT, GROUP_LONG } from './game/rules.js?v=1.0.1';
-import { planCpuShot, objectBallsOnTable } from './game/cpu.js?v=1.0.1';
-import { Hud } from './ui/hud.js?v=1.0.1';
-import { Dialogs } from './ui/dialogs.js?v=1.0.1';
-import { loadSettings, saveSettings, loadGame, saveGame, clearGame } from './ui/settings.js?v=1.0.1';
-import { $, h } from './ui/dom.js?v=1.0.1';
-import { Sound } from './audio/sound.js?v=1.0.1';
-import { AimPad } from './input/aimPad.js?v=1.0.1';
-import { SpinControl } from './input/spinControl.js?v=1.0.1';
-import { CameraGestures } from './input/cameraGestures.js?v=1.0.1';
-import { GameRenderer } from './render/renderer.js?v=1.0.1';
+import { Simulation } from './physics/simulation.js?v=1.0.2';
+import { DT } from './physics/constants.js?v=1.0.2';
+import { shotToStrike } from './physics/cue.js?v=1.0.2';
+import { castCueBall } from './physics/raycast.js?v=1.0.2';
+import { createRng } from './physics/rng.js?v=1.0.2';
+import { setupRack } from './game/rack.js?v=1.0.2';
+import { createMatch, evaluateShot, applyOutcome, legalTargets, FOUL_TEXT, GROUP_LONG } from './game/rules.js?v=1.0.2';
+import { planCpuShot, objectBallsOnTable } from './game/cpu.js?v=1.0.2';
+import { Hud } from './ui/hud.js?v=1.0.2';
+import { Dialogs } from './ui/dialogs.js?v=1.0.2';
+import { loadSettings, saveSettings, loadGame, saveGame, clearGame } from './ui/settings.js?v=1.0.2';
+import { $, h } from './ui/dom.js?v=1.0.2';
+import { Sound } from './audio/sound.js?v=1.0.2';
+import { AimPad } from './input/aimPad.js?v=1.0.2';
+import { SpinControl } from './input/spinControl.js?v=1.0.2';
+import { CameraGestures } from './input/cameraGestures.js?v=1.0.2';
+import { GameRenderer } from './render/renderer.js?v=1.0.2';
 
 /** @typedef {'menu'|'aim'|'cpu'|'strike'|'roll'|'handover'|'replay'|'over'} State */
 
@@ -36,6 +36,8 @@ function webglAvailable() {
   }
 }
 
+const bootStage = (s) => { /** @type {any} */ (window).__bootStage = s; };
+bootStage('Module geladen, prüfe WebGL');
 if (!webglAvailable()) {
   fatal('WebGL nicht verfügbar', 'Dein Browser oder Gerät unterstützt kein WebGL, das für die 3D-Darstellung nötig ist. Bitte aktiviere die Hardwarebeschleunigung oder verwende einen aktuellen Browser (Chrome, Safari, Firefox, Edge).');
   throw new Error('WebGL nicht verfügbar');
@@ -54,6 +56,7 @@ previewSim.recordEvents = false;
 /** @type {import('./render/renderer.js').GameRenderer} */
 let renderer;
 try {
+  bootStage('Grafik wird gestartet');
   renderer = new GameRenderer(/** @type {HTMLCanvasElement} */ ($('#gl')), table, sim.R);
 } catch (e) {
   fatal('WebGL-Fehler', 'Die 3D-Ansicht konnte nicht gestartet werden. Bitte schließe andere Tabs oder starte den Browser neu.');
@@ -841,6 +844,7 @@ renderer.resize(stage.clientWidth, stage.clientHeight);
 window.addEventListener('orientationchange', () => setTimeout(() => renderer.resize(stage.clientWidth, stage.clientHeight), 250));
 
 // Start
+bootStage('Tisch und Kugeln werden aufgebaut');
 renderer.setQuality(settings.quality);
 renderer.buildBalls(settings.colorblind);
 applySetting('init');
@@ -851,6 +855,7 @@ startLoop();
 /** @type {any} */ (window).__billardReady = true;
 $('#boot').classList.add('gone');
 setTimeout(() => $('#boot')?.remove(), 400);
+bootStage('Menü wird geöffnet');
 showMenu();
 
 // für Tests/Debugging im Browser

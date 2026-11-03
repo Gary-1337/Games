@@ -116,10 +116,10 @@ die Gleitreibung krümmt die Bahn.
 
 ## Neue Version veröffentlichen
 
-Alle Modul-Pfade tragen die Version als Query (`?v=1.0.1`), damit Browser nach einem Update nie alte und
+Alle Modul-Pfade tragen die Version als Query (`?v=1.0.2`), damit Browser nach einem Update nie alte und
 neue Dateien mischen (GitHub Pages cacht 10 Minuten). Beim Release die Version überall ersetzen,
 auch `VERSION` in `src/ui/dialogs.js`:
 
 ```bash
-grep -rl "1\.0\.1" index.html src vendor | xargs sed -i "s/1\.0\.1/1.0.2/g"
+grep -rl "1.0.2" index.html src vendor | xargs sed -i "s/1.0.2/1.0.3/g"
 ```

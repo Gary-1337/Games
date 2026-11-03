@@ -1,12 +1,12 @@
 // @ts-check
 // Three.js-Szene: Tisch, Kugeln, Queue, Overlays, Licht, adaptive Qualität.
-import * as THREE from '../../vendor/three.module.js?v=1.0.1';
-import { RoomEnvironment } from '../../vendor/RoomEnvironment.js?v=1.0.1';
-import { buildTable } from './tableMesh.js?v=1.0.1';
-import { makeBallTexture, makeBlobTexture, makeLabelTexture } from './textures.js?v=1.0.1';
-import { CameraRig } from './camera.js?v=1.0.1';
-import { Overlay } from './overlay.js?v=1.0.1';
-import { CueStick } from './cueStick.js?v=1.0.1';
+import * as THREE from '../../vendor/three.module.js?v=1.0.2';
+import { RoomEnvironment } from '../../vendor/RoomEnvironment.js?v=1.0.2';
+import { buildTable } from './tableMesh.js?v=1.0.2';
+import { makeBallTexture, makeBlobTexture, makeLabelTexture } from './textures.js?v=1.0.2';
+import { CameraRig } from './camera.js?v=1.0.2';
+import { Overlay } from './overlay.js?v=1.0.2';
+import { CueStick } from './cueStick.js?v=1.0.2';
 
 export const QUALITY = {
   low: { maxDpr: 1, segments: [20, 14], env: false },

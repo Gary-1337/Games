@@ -5,6 +5,11 @@ Die aktuelle Version liegt immer in `index.html`, die Quellen in `src/` (ES-Modu
 Die Versionsnummer steht unten im Hauptmenü.
 **Rollback:** älteren Stand mit `git checkout <commit> -- billard-8-ball` zurückholen.
 
+## 1.0.2 (03.11.2026)
+- Startbildschirm zeigt Version und Ladephase (Dateien geladen, Grafik, Tisch, Menü)
+- Startwächter meldet nach 12 s, bei welcher Phase das Laden hängt
+- Link auf der Startseite trägt die Version, damit keine alte Spielseite aus dem Cache kommt
+
 ## 1.0.1 (03.11.2026)
 - Start auf Android repariert: Das Spiel blieb bei „Lade Billard…“ stehen
 - Three.js wird jetzt mitgeliefert (`vendor/`) statt per Import-Map vom CDN geladen; kein Top-Level-await mehr
