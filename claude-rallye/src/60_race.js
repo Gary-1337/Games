@@ -191,6 +191,12 @@ function passCheckpoint(car, k, race) {
   if (car.finished) return;
   car.nextCp = (k + 1) % n;
   if (k > 0 && car.human >= 0 && race.audible) Sound.beep(1180, 0.06, 'triangle', 0.08);
+  // Zwischenzeit gegen die eigene beste Runde dieses Rennens
+  if (k > 0 && car.human >= 0 && race.mode !== 'rally') {
+    const sp = race.t - car.lapStart; (car.curSplits || (car.curSplits = []))[k] = sp;
+    const ref = car.bestSplits && car.bestSplits[k];
+    if (ref != null && car.lap > 0) { const d = sp - ref; flashMsg(car, 'Zwischenzeit ' + (d <= 0 ? '−' : '+') + Math.abs(d).toFixed(2), d <= 0 ? '#46d68a' : '#ff8a3d'); car.msgT = 1.6; }
+  }
   // Abstand zum Führenden über das Durchfahrts-Protokoll
   const key = (k === 0 ? car.lap : lapKey) + '_' + k;
   if (race.passLog.has(key)) car.lastPass = race.t - race.passLog.get(key);
@@ -200,12 +206,20 @@ function completeLap(car, race) {
   const lt = race.t - car.lapStart;
   car.lapTimes.push(lt);
   const isBest = car.best == null || lt < car.best;
-  if (isBest) car.best = lt;
+  if (isBest) { car.best = lt; if (car.curSplits) car.bestSplits = car.curSplits; }
+  car.curSplits = [];
+  // Schnellste Runde des Rennens
+  if (race.mode !== 'trial' && race.mode !== 'demo' && (!race.fastLap || lt < race.fastLap.t)) {
+    const had = !!race.fastLap; race.fastLap = { t: lt, id: car.id, name: car.name };
+    if (had && race.audible && race.mode !== 'sim') Speaker.say(Speaker.pick(['Schnellste Runde für ' + car.name + '!', car.name + ' fährt die schnellste Rennrunde!']), 'fl', 20);
+    car.fastFlash = had;
+  } else car.fastFlash = false;
   car.lapStart = race.t;
   const human = car.human >= 0;
   if (human && race.mode !== 'demo' && race.mode !== 'test') {
     const rank = addRecord(race.trackId, { name: car.name, time: lt, cls: car.cls.name, date: new Date().toLocaleDateString('de-AT'), mode: race.mode });
     if (rank === 1) { flashMsg(car, 'STRECKENREKORD!', '#ffd23e'); Speaker.say(Speaker.pick(['Neuer Streckenrekord!', 'Rekordrunde! Unglaublich!', 'Das ist ein neuer Streckenrekord!']), 'rec', 8, 2); }
+    else if (car.fastFlash) flashMsg(car, 'SCHNELLSTE RENNRUNDE ' + fmtTime(lt), '#c08cff');
     else if (isBest && car.lapTimes.length > 1) flashMsg(car, 'Persönliche Bestzeit', '#46d68a');
     Sound.lap(rank === 1 || isBest);
   }
@@ -293,6 +307,14 @@ function updateRace(race, dt) {
     if (sec < race.lastBeep && sec >= 1 && sec <= 3) { race.lastBeep = sec; if (race.audible) Sound.countdown(false); }
     if (race.cd <= 0) {
       race.state = 'running'; race.t = 0; race.goT = 1.2;
+      // Raketenstart: Gas erst kurz vor Grün gedrückt → Schub
+      if (race.mode !== 'derby' && race.mode !== 'demo' && race.mode !== 'sim') for (const car of race.cars) {
+        if (car.human >= 0) {
+          const e = car.startHeld ? car.startAt : -1;
+          if (e >= 0 && e <= 0.35) { car.boostT = 1.3; flashMsg(car, 'RAKETENSTART!', '#38c4ff'); if (race.audible) Sound.beep(880, 0.2, 'sawtooth', 0.08); }
+          else if (e > 0.35 && e <= 0.7) { car.boostT = 0.6; flashMsg(car, 'Guter Start', '#8fd8ff'); }
+        } else if (car.ai && Math.random() < 0.18) car.boostT = 0.7;
+      }
       if (race.audible && race.mode !== 'demo') Speaker.say(race.mode === 'derby' ? Speaker.pick(['Auf geht\'s, Blech verbiegen!', 'Die Arena bebt – und los!', 'Möge das stärkste Blech gewinnen!']) : Speaker.pick(['Und los geht\'s!', 'Grün! Das Feld setzt sich in Bewegung!', 'Die Ampel ist aus – los!', 'Start frei, und alle geben Vollgas!']), 'go', 3, 2);
       if (race.audible) Sound.countdown(true);
     }
@@ -313,7 +335,16 @@ function updateRace(race, dt) {
       else if (inp.edge.cp && running) { resetToCheckpoint(car, race); if (race.mode === 'derby') car.damage = Math.min(99, car.damage + 8); }
       if (inp.edge.item && running && race.powerups) PU.use(car, race);
     } else if (car.ai) inp = aiControl(car, race, dt);
-    if (!running) { car.thr = inp.thr; inp = { thr: 0, brk: 0, steer: 0, edge: {} }; }
+    if (!running) {
+      if (race.state === 'countdown' && car.human >= 0) {
+        if (inp.thr > 0.5) { if (!car.startHeld) { car.startHeld = true; car.startAt = race.cd; } } else car.startHeld = false;
+      }
+      car.thr = inp.thr; inp = { thr: 0, brk: 0, steer: 0, edge: {} };
+    }
+    if (!race.powerups && car.boostT > 0) {
+      car.boostT -= dt;
+      if (!car.air && Math.random() < dt * 30) Particles.add('puff', car.x - Math.cos(car.a) * 9, car.y - Math.sin(car.a) * 9, car.z + 3, -car.vx * 0.2, -car.vy * 0.2, 0, 0.3, 3, '120,200,255', 0, 2);
+    }
 
     // Boxendienst
     car.inBox = !!(race.rules.pits && rt.pit && inBoxRect(rt.pit.box, car.x, car.y));

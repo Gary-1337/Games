@@ -4,6 +4,16 @@ Top-Down-Arcade-Rennspiel in einer einzigen Datei (HTML5 + Canvas + JavaScript).
 Die aktuelle Version liegt immer in `index.html`. Die Versionsnummer steht unten rechts im Hauptmenü.
 Unter `versions/` liegen höchstens 3 Versionsstände, ältere werden gelöscht (sie bleiben in der Git-Historie abrufbar). **Rollback:** gewünschte Datei aus `versions/` als `index.html` verwenden. Alle Änderungen sind hier dokumentiert.
 
+## 1.8.0 (10.11.2026)
+Überarbeitung: schneller und drei neue Spielelemente.
+- **Leistung:** Ein Bild braucht rund halb so viel Rechenzeit (gemessen ohne Grafikkarte 24 → 11 ms). Gezeichnet wird nur noch der sichtbare Ausschnitt, Objekte und Autos außerhalb des Bildes werden übersprungen, Bremsspuren liegen direkt in der Streckengrafik statt in einer eigenen Ebene (sie überstehen einen Zoomwechsel).
+- **Kürzere Ladezeit:** Der Streckenaufbau ist etwa 40 % schneller (ca. 500 → 230–360 ms); der Untergrund wird zwischengespeichert, ein Neustart derselben Strecke baut ihn nicht neu.
+- **Grafikqualität** in den Optionen: Auto / Hoch / Mittel / Niedrig. „Auto“ senkt die Stufe selbst, wenn das Spiel länger als 3 s ruckelt (Hinweis erscheint).
+- **Raketenstart:** Wer das Gas erst in den letzten 0,35 s vor Grün drückt, bekommt einen Schub (1,3 s); bis 0,7 s vorher einen kleinen. Zu früh Gas geben kostet nichts, bringt aber keinen Schub. Auch KI-Fahrer erwischen gelegentlich einen guten Start. Nicht im Derby.
+- **Zwischenzeiten:** An jedem Checkpoint erscheint der Abstand zur eigenen besten Runde dieses Rennens (grün = schneller, orange = langsamer).
+- **Schnellste Rennrunde:** Violetter Punkt in der Rangliste beim Fahrer mit der schnellsten Runde, Meldung „SCHNELLSTE RENNRUNDE“ und Ansage des Kommentators.
+- Neuer Test `tests/extras.py`.
+
 ## 1.7.2 (02.11.2026)
 - **Verpasster Checkpoint:** Fährt man an einem Checkpoint vorbei, läuft ein 5-Sekunden-Countdown („CHECKPOINT VERPASST · Reset in … s“ über dem Auto, leiser Piepton je Sekunde). Fährt man nicht zurück, wird das Auto danach automatisch kurz **vor** den verpassten Checkpoint gesetzt. Gilt in allen Modi mit Checkpoints, auch in Rallye-Etappen.
 - Neuer Test `tests/missedcp.py`.

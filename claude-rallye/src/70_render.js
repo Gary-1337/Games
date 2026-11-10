@@ -298,6 +298,11 @@ function drawCountdown(ctx, race) {
   if (race.state !== 'countdown' || race.cd <= 3) {
     ctx.strokeText(txt, cx, 270); ctx.fillStyle = go ? '#3bea7a' : '#fff'; ctx.fillText(txt, cx, 270);
   }
+  if (!go && race.mode !== 'derby' && race.mode !== 'demo') {
+    ctx.font = '600 13px "Chakra Petch",sans-serif'; ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,.7)';
+    const tip = 'Tipp: Gas erst kurz vor Grün drücken = Raketenstart';
+    ctx.strokeText(tip, cx, 172); ctx.fillStyle = '#8fd8ff'; ctx.fillText(tip, cx, 172);
+  }
   ctx.restore();
 }
 
@@ -338,6 +343,7 @@ function drawPanel(ctx, race) {
       ctx.fillStyle = c.color; ctx.fillRect(x0 + 32, y + 5, 10, 10);
       ctx.fillStyle = c.human >= 0 ? '#fff' : '#c4ccd9'; ctx.font = (c.human >= 0 ? '700' : '500') + ' 13px "Chakra Petch",sans-serif';
       ctx.fillText(c.name.slice(0, 13), x0 + 48, y + 15);
+      if (race.fastLap && race.fastLap.id === c.id) { ctx.fillStyle = '#c08cff'; ctx.beginPath(); ctx.arc(x0 + 48 + ctx.measureText(c.name.slice(0, 13)).width + 9, y + 10, 3.5, 0, 7); ctx.fill(); }
       ctx.textAlign = 'right'; ctx.fillStyle = c.out ? '#ff5a5a' : c.finished ? '#47d48a' : '#8a97ad'; ctx.font = '500 12px "Chakra Petch",sans-serif';
       let tag = c.gapText;
       if (c.ai && c.ai.mode !== 'race' && !c.finished) tag = 'BOX';
