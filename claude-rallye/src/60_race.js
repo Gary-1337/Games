@@ -18,20 +18,53 @@ const CAM_ZOOM = [1, 1.55, 2.1];
 const camZoom = () => CAM_ZOOM[Options.data.camera != null ? Options.data.camera : 1] || 1;
 /** Auflösung der vorberechneten Szene: so fein, dass sie auf dem Bildschirm (Bühnen-Skalierung × Pixeldichte × Zoom) scharf bleibt. */
 function sceneRes(solo, demo) {
-  const z = solo && !demo && camZoom() > 1 ? camZoom() : 1;
-  const max = demo ? 2 : Touch.detect() ? 2 : 3;
+  const z = solo && !demo && camZoom() > 1 ? camZoom() : 1, q = Gfx.level();
+  const max = demo ? Math.min(2, q + 1) : q === 0 ? (z > 1 ? 2 : 1) : q === 1 ? 2 : Touch.detect() ? 2 : 3;
   return clamp(Math.ceil(RK * z - 0.2), 1, max);
+}
+/** Grafikqualität: Option „auto/hoch/mittel/niedrig“; „auto“ senkt die Stufe selbst, wenn das Spiel dauerhaft ruckelt. */
+const Gfx = {
+  auto: -1, slowT: 0, okT: 0, avg: 16,
+  level() {
+    const o = Options.data && Options.data.gfx;
+    if (o === 'high') return 2; if (o === 'mid') return 1; if (o === 'low') return 0;
+    if (this.auto < 0) this.auto = Touch.detect() ? 1 : 2;
+    return this.auto;
+  },
+  /** größter Zeichenfaktor der Bühne je Stufe */
+  maxRK() { const q = this.level(); return q === 0 ? 1 : q === 1 ? 1.5 : Touch.detect() ? 2 : 3; },
+  /** Jede Bildfolge im Rennen: Bildzeit beobachten (nur bei „auto“). */
+  watch(dt, racing) {
+    if (!racing || (Options.data.gfx && Options.data.gfx !== 'auto') || document.hidden) { this.slowT = 0; return; }
+    this.avg += (dt * 1000 - this.avg) * 0.05;
+    if (this.avg > 24) this.slowT += dt; else this.slowT = Math.max(0, this.slowT - dt * 2);
+    if (this.slowT > 3 && this.auto > 0) {
+      this.auto--; this.slowT = 0; this.avg = 16;
+      resize(); toast('Grafik automatisch reduziert (' + ['niedrig', 'mittel'][this.auto] + ') – änderbar in den Optionen');
+    }
+  }
+};
+/** Reifenspuren: werden direkt in die Szene gezeichnet (keine eigene Ebene mehr) und für einen Neuaufbau mitgeschrieben. */
+const SKID_MAX = 40000;
+function skidStroke(race, a, b, c, d, lw, style) {
+  const g = race.skidCtx;
+  g.strokeStyle = style; g.lineWidth = lw; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(c[0], c[1]); g.moveTo(b[0], b[1]); g.lineTo(d[0], d[1]); g.stroke();
+}
+function bindSkid(race) {
+  const g = race.layers.scene.getContext('2d'), rs = race.layers.rs;
+  g.setTransform(rs, 0, 0, rs, 0, 0); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+  race.skidCtx = g;
+  for (const e of race.skidLog) skidStroke(race, [e[0], e[1]], [e[2], e[3]], [e[4], e[5]], [e[6], e[7]], e[8], e[9]);
 }
 /** Szene neu in höherer Auflösung bauen, falls die aktuelle nicht mehr reicht (Zoom/Fenstergröße geändert). */
 function cycleCameraRes(race) {
   const need = sceneRes(race.cars.filter(c => c.human >= 0).length === 1, race.mode === 'demo');
   if (need <= race.layers.rs) return;
-  const old = race.skid;
   const flags = race.layers.dyn.filter(o => o.t === 'cpflag');
   race.layers = buildScene(race.rt.src, race.rt, { checkpoints: Options.data.showCps && race.mode !== 'demo', rs: need }, race.weather);
   race.layers.dyn.push(...flags);
-  race.skid = document.createElement('canvas'); race.skid.width = W * need; race.skid.height = H * need;
-  race.skidCtx = race.skid.getContext('2d'); race.skidCtx.drawImage(old, 0, 0, W * need, H * need); race.skidCtx.setTransform(need, 0, 0, need, 0, 0);
+  bindSkid(race);
 }
 /** Kamera im Rennen umschalten (Taste C / Pausenmenü); Szene bei Bedarf in hoher Auflösung neu bauen. */
 function cycleCamera(race) {
@@ -65,14 +98,13 @@ function createRace(cfg) {
   // Zoom-Kamera (nur allein): Szene in doppelter Auflösung, damit sie vergrößert scharf bleibt
   const rs = sceneRes(cfg.players.length === 1, cfg.mode === 'demo');
   const layers = buildScene(rt.src, rt, { checkpoints: Options.data.showCps && cfg.mode !== 'demo', rs }, wx);
-  const skid = document.createElement('canvas'); skid.width = W * rs; skid.height = H * rs;
-  const skidCtx = skid.getContext('2d'); skidCtx.setTransform(rs, 0, 0, rs, 0, 0);
   const R = {
-    cfg, mode: cfg.mode, rt, layers, skid, skidCtx, rules: { ...cfg.rules }, laps: cfg.laps, weather: wx,
+    cfg, mode: cfg.mode, rt, layers, skidLog: [], skidCtx: null, rules: { ...cfg.rules }, laps: cfg.laps, weather: wx,
     trackId: src.id, trackName: src.name, cars: [], state: 'countdown', time: 0, cd: 3.99, lastBeep: 4, t: 0,
     firstFinishT: null, lastHumanFinishT: null, finishOrder: [], passLog: new Map(), audible: cfg.mode !== 'demo',
     endT: 0, results: null, ghost: null, banner: null
   };
+  bindSkid(R);
   R.career = !!cfg.career;
   if (cfg.mode === 'derby') {
     // Demolition Derby: nur Schaden zählt, kein Sprit/Reifen/Boxen
@@ -449,12 +481,9 @@ function trackEffects(car, race, dt) {
   if (marking) {
     const cur = wl.map(([a, b]) => P(car.x + fx * a + rx * b, car.y + fy * a + ry * b, car.z));
     if (car.skidPrev) {
-      const g = race.skidCtx;
-      g.strokeStyle = wet ? 'rgba(18,18,20,0.14)' : (SKID_COL[car.surf] || 'rgba(0,0,0,.2)');
-      g.lineWidth = (soft ? 3 : 2.2) * projS(car.y); g.lineCap = 'round';
-      g.beginPath();
-      for (let i = 0; i < 2; i++) { g.moveTo(car.skidPrev[i][0], car.skidPrev[i][1]); g.lineTo(cur[i][0], cur[i][1]); }
-      g.stroke();
+      const style = wet ? 'rgba(18,18,20,0.14)' : (SKID_COL[car.surf] || 'rgba(0,0,0,.2)'), lw = (soft ? 3 : 2.2) * projS(car.y), q = car.skidPrev;
+      skidStroke(race, q[0], q[1], cur[0], cur[1], lw, style);
+      if (race.skidLog.length < SKID_MAX) race.skidLog.push([q[0][0], q[0][1], q[1][0], q[1][1], cur[0][0], cur[0][1], cur[1][0], cur[1][1], lw, style]);
     }
     car.skidPrev = cur;
   } else car.skidPrev = null;

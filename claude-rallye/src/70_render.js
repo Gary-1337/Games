@@ -113,19 +113,31 @@ function drawRace(ctx, race) {
     ctx.setTransform(cam.z * RK, 0, 0, cam.z * RK, -cam.x0 * cam.z * RK, -cam.y0 * cam.z * RK);
   }
   const L = race.layers, wx = race.weather;
-  ctx.drawImage(L.scene, 0, 0, W, H);
-  ctx.drawImage(race.skid, 0, 0, W, H);
+  // Sichtfenster in Weltkoordinaten (für Ausschnitt und Sichtbarkeitsprüfung)
+  const vx0 = cam ? cam.x0 : 0, vy0 = cam ? cam.y0 : 0, vw = cam ? W / cam.z : W, vh = cam ? H / cam.z : H;
+  if (cam) {
+    // nur den sichtbaren Ausschnitt der Szene übertragen
+    const k = L.rs, sx = Math.max(0, Math.floor(vx0 * k)), sy = Math.max(0, Math.floor(vy0 * k));
+    const sw = Math.min(L.scene.width - sx, Math.ceil(vw * k) + 2), sh = Math.min(L.scene.height - sy, Math.ceil(vh * k) + 2);
+    ctx.drawImage(L.scene, sx, sy, sw, sh, sx / k, sy / k, sw / k, sh / k);
+  } else ctx.drawImage(L.scene, 0, 0, W, H);
+  const vis = (o, m) => !cam || (o.x > vx0 - m && o.x < vx0 + vw + m && o.y > vy0 - m && o.y < vy0 + vh + m + 60);
   if (race.powerups) PU.drawGround(ctx, race);
   // Autos + dynamische Objekte (Brücken, Tribünen, Flaggen) nach Tiefe
-  const bridges = L.dyn.filter(o => o.t === 'bridge');
+  const bridges = L.bridges || (L.bridges = L.dyn.filter(o => o.t === 'bridge'));
   const items = race.cars.map(c => { const v = carView(c, race); return { k: viewKey(v, bridges), car: v }; });
   if (race.mode === 'trial') { const g = ghostView(race); if (g) items.push({ k: viewKey(g, bridges), car: g }); }
   const p1 = race.cars.find(c => c.human === 0);
-  for (const o of L.dyn) { if (o.t === 'cpflag') o.hl = !!(p1 && !p1.finished && p1.nextCp === o.k); items.push({ k: o.t === 'bridge' ? o.key : o.y, obj: o }); }
+  for (const o of L.dyn) {
+    if (o.t !== 'bridge' && o.t !== 'stand' && o.t !== 'gate' && !vis(o, 70)) continue;       // außerhalb des Bildes
+    if (o.t === 'cpflag') o.hl = !!(p1 && !p1.finished && p1.nextCp === o.k);
+    items.push({ k: o.t === 'bridge' ? o.key : o.y, obj: o });
+  }
   items.sort((a, b) => a.k - b.k);
   for (const it of items) {
     if (it.obj) { ZB = it.obj.zb || 0; drawObject3D(ctx, it.obj, L.theme, race.time); ZB = 0; continue; }
     const v = it.car;
+    if (!vis(v, 50)) continue;
     drawCar3D(ctx, v);
     // eingebackene Objekte, die vor dem Auto stehen und es überdecken, erneut zeichnen
     for (const o of L.baked) {
@@ -138,7 +150,7 @@ function drawRace(ctx, race) {
   if (race.powerups) { PU.drawBoxes(ctx, race); PU.drawCarFx(ctx, race); }
   Particles.draw(ctx);
   drawWeather(ctx, race);
-  ctx.drawImage(L.overlay, 0, 0);
+  if (Gfx.level() > 0) ctx.drawImage(L.overlay, 0, 0);
   if (race.mode === 'demo') { if (cam) ctx.restore(); return; }
   if (cam) {
     // Beschriftungen: Schrift nur mäßig mitvergrößern

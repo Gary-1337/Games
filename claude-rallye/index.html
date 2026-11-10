@@ -1813,13 +1813,14 @@ function fillGround(t, data, x0, y0, x1, y1, dist) {
   const cellOf = (cx, cy) => g[clamp(cy, 0, GH - 1) * GW + clamp(cx, 0, GW - 1)];
   const c1 = [0, 0, 0], c2 = [0, 0, 0];
   const types = [0, 0, 0, 0], wts = [0, 0, 0, 0];
+  let n = 0;
+  const add = (ty, w) => { for (let k = 0; k < n; k++) if (types[k] === ty) { wts[k] += w; return; } types[n] = ty; wts[n] = w; n++; };
   for (let y = y0; y < y1; y++) {
     const gy = (y + 0.5) / CELL - 0.5, iy = Math.floor(gy), fy = gy - iy;
     for (let x = x0; x < x1; x++) {
       const gx = (x + 0.5) / CELL - 0.5, ix = Math.floor(gx), fx = gx - ix;
       // Gewichte der vier umliegenden Zellen nach Typ zusammenfassen
-      let n = 0;
-      const add = (ty, w) => { for (let k = 0; k < n; k++) if (types[k] === ty) { wts[k] += w; return; } types[n] = ty; wts[n] = w; n++; };
+      n = 0;
       add(cellOf(ix, iy), (1 - fx) * (1 - fy)); add(cellOf(ix + 1, iy), fx * (1 - fy));
       add(cellOf(ix, iy + 1), (1 - fx) * fy); add(cellOf(ix + 1, iy + 1), fx * fy);
       let d = 0, d2 = -1;
@@ -1888,6 +1889,27 @@ function makeGround(t, withDirt) {
   fillGround(t, img.data, 0, 0, W, H, withDirt ? { out: trackDistanceField(t), inn: insideDistanceField(t) } : null);
   g.putImageData(img, 0, 0);
   return { canvas: c, ctx: g, img };
+}
+/** Boden mit Schmutzrändern aus dem Zwischenspeicher (hängt nur von Raster, Höhen und Stil ab – nicht vom Wetter).
+ *  Liefert immer eine frische Zeichenfläche, weil die Szene darauf weiterzeichnet. */
+const groundCache = [];
+function groundKey(t) {
+  let h = 2166136261 >>> 0;
+  const g = t.grid; for (let i = 0; i < g.length; i++) h = Math.imul(h ^ g[i], 16777619);
+  if (t.hm) { const v = new Int32Array(t.hm.buffer, t.hm.byteOffset, t.hm.length); for (let i = 0; i < v.length; i++) h = Math.imul(h ^ v[i], 16777619); }
+  return t.theme + ':' + (h >>> 0);
+}
+function cachedGround(t) {
+  const key = groundKey(t);
+  let e = groundCache.find(c => c.key === key);
+  if (!e) {
+    const img = new ImageData(W, H);
+    fillGround(t, img.data, 0, 0, W, H, { out: trackDistanceField(t), inn: insideDistanceField(t) });
+    e = { key, img }; groundCache.push(e); if (groundCache.length > 4) groundCache.shift();
+  } else { groundCache.splice(groundCache.indexOf(e), 1); groundCache.push(e); }
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d'); g.putImageData(e.img, 0, 0);
+  return { canvas: c, ctx: g };
 }
 /** Aktualisiert einen Bodenbereich (Editor). */
 function updateGround(gr, t, x0, y0, x1, y1) {
@@ -2851,8 +2873,17 @@ function splatTerrain(c, t, F, rs = 1) {
   const WW = W * rs, HH = H * rs, zs = VIEW.ZS * rs;
   const src = F.getContext('2d').getImageData(0, 0, WW, HH).data;
   const img = c.getImageData(0, 0, WW, HH), out = img.data;
+  const src32 = new Uint32Array(src.buffer), out32 = new Uint32Array(out.buffer);   // ganze Pixel in einem Schritt kopieren
   let hRow = new Float32Array(WW), hNext = new Float32Array(WW);
-  const fillRow = (arr, y) => { for (let x = 0; x < WW; x++) arr[x] = terrainH(t, (x + 0.5) / rs, (y + 0.5) / rs); };
+  // Höhenzeile schnell füllen: erst die beiden Rasterzeilen der Höhenkarte mischen, dann quer interpolieren (statt terrainH je Pixel)
+  const hm = t.hm, colH = new Float32Array(HMW), gxs = new Float32Array(WW);
+  for (let x = 0; x < WW; x++) gxs[x] = clamp((x + 0.5) / rs / HM, 0, HMW - 1.001);
+  const fillRow = (arr, y) => {
+    if (!hm) { arr.fill(0); return; }
+    const gy = clamp((y + 0.5) / rs / HM, 0, HMH - 1.001), iy = gy | 0, fy = gy - iy, o = iy * HMW;
+    for (let i = 0; i < HMW; i++) colH[i] = hm[o + i] * (1 - fy) + hm[o + HMW + i] * fy;
+    for (let x = 0; x < WW; x++) { const gx = gxs[x], ix = gx | 0, fx = gx - ix; arr[x] = colH[ix] * (1 - fx) + colH[ix + 1] * fx; }
+  };
   fillRow(hRow, 0);
   for (let y = 0; y < HH; y++) {
     if (y + 1 < HH) fillRow(hNext, y + 1); else hNext.set(hRow);
@@ -2862,9 +2893,11 @@ function splatTerrain(c, t, F, rs = 1) {
       if (X < 0 || X >= WW) continue;
       const top = py - hRow[x] * zs * s, bot = py1 - hNext[x] * zs * s1;
       const y0 = Math.floor(top), y1 = Math.max(y0 + 1, Math.ceil(bot)), cliff = bot - top - step > 1.5 * rs, edge = top + step + 0.5;
-      const si = (y * WW + x) * 4;
-      for (let Y = Math.max(0, y0); Y < Math.min(HH, y1); Y++) {
-        const k = cliff && Y > edge ? 0.62 - Math.min(0.15, (Y - edge) * 0.01 / rs) : 1, di = (Y * WW + X) * 4;
+      const sp = y * WW + x, si = sp * 4, Ya = y0 < 0 ? 0 : y0, Yb = y1 > HH ? HH : y1;
+      if (!cliff) { const px = src32[sp]; for (let Y = Ya; Y < Yb; Y++) out32[Y * WW + X] = px; continue; }
+      for (let Y = Ya; Y < Yb; Y++) {
+        if (Y <= edge) { out32[Y * WW + X] = src32[sp]; continue; }
+        const k = 0.62 - Math.min(0.15, (Y - edge) * 0.01 / rs), di = (Y * WW + X) * 4;
         out[di] = src[si] * k; out[di + 1] = src[si + 1] * k; out[di + 2] = src[si + 2] * k; out[di + 3] = 255;
       }
     }
@@ -2877,7 +2910,7 @@ function buildScene(t, rt, opt = {}, wx = { sky: 'clear', time: 'day' }) {
   const theme = THEME_SKY[t.theme] ? t.theme : 'meadow', look = t.look && THEME_SKY[t.look] ? t.look : theme, SC = skyColors(look, wx);
   const RS = opt.rs || 1;          // Auflösung der Bodenebene und Szene (2 für die Zoom-Kamera)
   // 1) Flache Welt: Boden mit Schmutzrändern, Gummispur, Markierungen, Schatten
-  const gr = makeGround(t, true);
+  const gr = cachedGround(t);
   let F = gr.canvas, g = gr.ctx;
   if (RS > 1) {
     // Boden pixelgenau hochrechnen (keine Unschärfe), Linien/Markierungen danach in voller Auflösung
@@ -4718,20 +4751,53 @@ const CAM_ZOOM = [1, 1.55, 2.1];
 const camZoom = () => CAM_ZOOM[Options.data.camera != null ? Options.data.camera : 1] || 1;
 /** Auflösung der vorberechneten Szene: so fein, dass sie auf dem Bildschirm (Bühnen-Skalierung × Pixeldichte × Zoom) scharf bleibt. */
 function sceneRes(solo, demo) {
-  const z = solo && !demo && camZoom() > 1 ? camZoom() : 1;
-  const max = demo ? 2 : Touch.detect() ? 2 : 3;
+  const z = solo && !demo && camZoom() > 1 ? camZoom() : 1, q = Gfx.level();
+  const max = demo ? Math.min(2, q + 1) : q === 0 ? (z > 1 ? 2 : 1) : q === 1 ? 2 : Touch.detect() ? 2 : 3;
   return clamp(Math.ceil(RK * z - 0.2), 1, max);
+}
+/** Grafikqualität: Option „auto/hoch/mittel/niedrig“; „auto“ senkt die Stufe selbst, wenn das Spiel dauerhaft ruckelt. */
+const Gfx = {
+  auto: -1, slowT: 0, okT: 0, avg: 16,
+  level() {
+    const o = Options.data && Options.data.gfx;
+    if (o === 'high') return 2; if (o === 'mid') return 1; if (o === 'low') return 0;
+    if (this.auto < 0) this.auto = Touch.detect() ? 1 : 2;
+    return this.auto;
+  },
+  /** größter Zeichenfaktor der Bühne je Stufe */
+  maxRK() { const q = this.level(); return q === 0 ? 1 : q === 1 ? 1.5 : Touch.detect() ? 2 : 3; },
+  /** Jede Bildfolge im Rennen: Bildzeit beobachten (nur bei „auto“). */
+  watch(dt, racing) {
+    if (!racing || (Options.data.gfx && Options.data.gfx !== 'auto') || document.hidden) { this.slowT = 0; return; }
+    this.avg += (dt * 1000 - this.avg) * 0.05;
+    if (this.avg > 24) this.slowT += dt; else this.slowT = Math.max(0, this.slowT - dt * 2);
+    if (this.slowT > 3 && this.auto > 0) {
+      this.auto--; this.slowT = 0; this.avg = 16;
+      resize(); toast('Grafik automatisch reduziert (' + ['niedrig', 'mittel'][this.auto] + ') – änderbar in den Optionen');
+    }
+  }
+};
+/** Reifenspuren: werden direkt in die Szene gezeichnet (keine eigene Ebene mehr) und für einen Neuaufbau mitgeschrieben. */
+const SKID_MAX = 40000;
+function skidStroke(race, a, b, c, d, lw, style) {
+  const g = race.skidCtx;
+  g.strokeStyle = style; g.lineWidth = lw; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(c[0], c[1]); g.moveTo(b[0], b[1]); g.lineTo(d[0], d[1]); g.stroke();
+}
+function bindSkid(race) {
+  const g = race.layers.scene.getContext('2d'), rs = race.layers.rs;
+  g.setTransform(rs, 0, 0, rs, 0, 0); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+  race.skidCtx = g;
+  for (const e of race.skidLog) skidStroke(race, [e[0], e[1]], [e[2], e[3]], [e[4], e[5]], [e[6], e[7]], e[8], e[9]);
 }
 /** Szene neu in höherer Auflösung bauen, falls die aktuelle nicht mehr reicht (Zoom/Fenstergröße geändert). */
 function cycleCameraRes(race) {
   const need = sceneRes(race.cars.filter(c => c.human >= 0).length === 1, race.mode === 'demo');
   if (need <= race.layers.rs) return;
-  const old = race.skid;
   const flags = race.layers.dyn.filter(o => o.t === 'cpflag');
   race.layers = buildScene(race.rt.src, race.rt, { checkpoints: Options.data.showCps && race.mode !== 'demo', rs: need }, race.weather);
   race.layers.dyn.push(...flags);
-  race.skid = document.createElement('canvas'); race.skid.width = W * need; race.skid.height = H * need;
-  race.skidCtx = race.skid.getContext('2d'); race.skidCtx.drawImage(old, 0, 0, W * need, H * need); race.skidCtx.setTransform(need, 0, 0, need, 0, 0);
+  bindSkid(race);
 }
 /** Kamera im Rennen umschalten (Taste C / Pausenmenü); Szene bei Bedarf in hoher Auflösung neu bauen. */
 function cycleCamera(race) {
@@ -4765,14 +4831,13 @@ function createRace(cfg) {
   // Zoom-Kamera (nur allein): Szene in doppelter Auflösung, damit sie vergrößert scharf bleibt
   const rs = sceneRes(cfg.players.length === 1, cfg.mode === 'demo');
   const layers = buildScene(rt.src, rt, { checkpoints: Options.data.showCps && cfg.mode !== 'demo', rs }, wx);
-  const skid = document.createElement('canvas'); skid.width = W * rs; skid.height = H * rs;
-  const skidCtx = skid.getContext('2d'); skidCtx.setTransform(rs, 0, 0, rs, 0, 0);
   const R = {
-    cfg, mode: cfg.mode, rt, layers, skid, skidCtx, rules: { ...cfg.rules }, laps: cfg.laps, weather: wx,
+    cfg, mode: cfg.mode, rt, layers, skidLog: [], skidCtx: null, rules: { ...cfg.rules }, laps: cfg.laps, weather: wx,
     trackId: src.id, trackName: src.name, cars: [], state: 'countdown', time: 0, cd: 3.99, lastBeep: 4, t: 0,
     firstFinishT: null, lastHumanFinishT: null, finishOrder: [], passLog: new Map(), audible: cfg.mode !== 'demo',
     endT: 0, results: null, ghost: null, banner: null
   };
+  bindSkid(R);
   R.career = !!cfg.career;
   if (cfg.mode === 'derby') {
     // Demolition Derby: nur Schaden zählt, kein Sprit/Reifen/Boxen
@@ -5149,12 +5214,9 @@ function trackEffects(car, race, dt) {
   if (marking) {
     const cur = wl.map(([a, b]) => P(car.x + fx * a + rx * b, car.y + fy * a + ry * b, car.z));
     if (car.skidPrev) {
-      const g = race.skidCtx;
-      g.strokeStyle = wet ? 'rgba(18,18,20,0.14)' : (SKID_COL[car.surf] || 'rgba(0,0,0,.2)');
-      g.lineWidth = (soft ? 3 : 2.2) * projS(car.y); g.lineCap = 'round';
-      g.beginPath();
-      for (let i = 0; i < 2; i++) { g.moveTo(car.skidPrev[i][0], car.skidPrev[i][1]); g.lineTo(cur[i][0], cur[i][1]); }
-      g.stroke();
+      const style = wet ? 'rgba(18,18,20,0.14)' : (SKID_COL[car.surf] || 'rgba(0,0,0,.2)'), lw = (soft ? 3 : 2.2) * projS(car.y), q = car.skidPrev;
+      skidStroke(race, q[0], q[1], cur[0], cur[1], lw, style);
+      if (race.skidLog.length < SKID_MAX) race.skidLog.push([q[0][0], q[0][1], q[1][0], q[1][1], cur[0][0], cur[0][1], cur[1][0], cur[1][1], lw, style]);
     }
     car.skidPrev = cur;
   } else car.skidPrev = null;
@@ -5358,19 +5420,31 @@ function drawRace(ctx, race) {
     ctx.setTransform(cam.z * RK, 0, 0, cam.z * RK, -cam.x0 * cam.z * RK, -cam.y0 * cam.z * RK);
   }
   const L = race.layers, wx = race.weather;
-  ctx.drawImage(L.scene, 0, 0, W, H);
-  ctx.drawImage(race.skid, 0, 0, W, H);
+  // Sichtfenster in Weltkoordinaten (für Ausschnitt und Sichtbarkeitsprüfung)
+  const vx0 = cam ? cam.x0 : 0, vy0 = cam ? cam.y0 : 0, vw = cam ? W / cam.z : W, vh = cam ? H / cam.z : H;
+  if (cam) {
+    // nur den sichtbaren Ausschnitt der Szene übertragen
+    const k = L.rs, sx = Math.max(0, Math.floor(vx0 * k)), sy = Math.max(0, Math.floor(vy0 * k));
+    const sw = Math.min(L.scene.width - sx, Math.ceil(vw * k) + 2), sh = Math.min(L.scene.height - sy, Math.ceil(vh * k) + 2);
+    ctx.drawImage(L.scene, sx, sy, sw, sh, sx / k, sy / k, sw / k, sh / k);
+  } else ctx.drawImage(L.scene, 0, 0, W, H);
+  const vis = (o, m) => !cam || (o.x > vx0 - m && o.x < vx0 + vw + m && o.y > vy0 - m && o.y < vy0 + vh + m + 60);
   if (race.powerups) PU.drawGround(ctx, race);
   // Autos + dynamische Objekte (Brücken, Tribünen, Flaggen) nach Tiefe
-  const bridges = L.dyn.filter(o => o.t === 'bridge');
+  const bridges = L.bridges || (L.bridges = L.dyn.filter(o => o.t === 'bridge'));
   const items = race.cars.map(c => { const v = carView(c, race); return { k: viewKey(v, bridges), car: v }; });
   if (race.mode === 'trial') { const g = ghostView(race); if (g) items.push({ k: viewKey(g, bridges), car: g }); }
   const p1 = race.cars.find(c => c.human === 0);
-  for (const o of L.dyn) { if (o.t === 'cpflag') o.hl = !!(p1 && !p1.finished && p1.nextCp === o.k); items.push({ k: o.t === 'bridge' ? o.key : o.y, obj: o }); }
+  for (const o of L.dyn) {
+    if (o.t !== 'bridge' && o.t !== 'stand' && o.t !== 'gate' && !vis(o, 70)) continue;       // außerhalb des Bildes
+    if (o.t === 'cpflag') o.hl = !!(p1 && !p1.finished && p1.nextCp === o.k);
+    items.push({ k: o.t === 'bridge' ? o.key : o.y, obj: o });
+  }
   items.sort((a, b) => a.k - b.k);
   for (const it of items) {
     if (it.obj) { ZB = it.obj.zb || 0; drawObject3D(ctx, it.obj, L.theme, race.time); ZB = 0; continue; }
     const v = it.car;
+    if (!vis(v, 50)) continue;
     drawCar3D(ctx, v);
     // eingebackene Objekte, die vor dem Auto stehen und es überdecken, erneut zeichnen
     for (const o of L.baked) {
@@ -5383,7 +5457,7 @@ function drawRace(ctx, race) {
   if (race.powerups) { PU.drawBoxes(ctx, race); PU.drawCarFx(ctx, race); }
   Particles.draw(ctx);
   drawWeather(ctx, race);
-  ctx.drawImage(L.overlay, 0, 0);
+  if (Gfx.level() > 0) ctx.drawImage(L.overlay, 0, 0);
   if (race.mode === 'demo') { if (cam) ctx.restore(); return; }
   if (cam) {
     // Beschriftungen: Schrift nur mäßig mitvergrößern
@@ -6092,6 +6166,8 @@ const UI = {
           <div class="row"><label class="l">Touch-Steuerung</label>${seg('otouch', ['Automatisch', 'An', 'Aus'], o.touch || 0)}</div>
           <div class="row"><label class="l">Kamera-Zoom (allein)</label>${seg('ocam', ['Aus', 'Folgen', 'Nah'], o.camera != null ? o.camera : 1)}</div>
           <div class="row"><label class="l">Checkpoints zeigen</label>${tog('ocps', o.showCps)}</div>
+          <div class="row"><label class="l">Grafikqualität</label>${seg('ogfx', ['Auto', 'Hoch', 'Mittel', 'Niedrig'], Math.max(0, ['auto', 'high', 'mid', 'low'].indexOf(o.gfx || 'auto')))}</div>
+          <div class="note" style="margin:-2px 0 8px 0">Auto senkt die Qualität selbst, wenn das Spiel ruckelt. Gilt ab dem nächsten Rennen.</div>
         </div>
         <div class="col" style="flex:1"><h3>Steuerung</h3>
           <table class="keytbl"><tr><td></td><td>Gas</td><td>Bremse</td><td>Lenken</td><td>Reset</td><td>Zum Checkpoint</td></tr>
@@ -6117,6 +6193,7 @@ const UI = {
     else if (act === 'oracemus') o.raceMusic = !o.raceMusic;
     else if (act === 'otouch') o.touch = +v;
     else if (act === 'ocam') o.camera = +v;
+    else if (act === 'ogfx') { o.gfx = ['auto', 'high', 'mid', 'low'][+v]; Gfx.auto = -1; resize(); }
     else if (act === 'ovoice') { o.voiceName = el.value; Speaker.voice = null; Options.save(); const was = o.commentary; o.commentary = true; Speaker.say('Hallo, ich bin dein Kommentator. Und los geht\'s!', 'test', 0, 2); o.commentary = was; return; }
     else if (act === 'ovtest') { const was = o.commentary; o.commentary = true; Speaker.say('Und da ist er! Neuer Streckenrekord! Was für eine Runde!', 'test', 0, 2); o.commentary = was; return; }
     else if (act === 'ocomm') { o.commentary = o.commentary !== true; if (o.commentary) { Options.save(); Speaker.say('Kommentator ist an.', 'test', 1, 2); } else Speaker.stop(); }
@@ -6929,6 +7006,7 @@ const Game = {
     Options.load();
     bindScreens();
     Touch.init();
+    resize();
     this.newDemo();
     UI.main();
     // Editor-Ereignisse
@@ -7124,7 +7202,7 @@ function resize() {
   const st = $('stage');
   st.style.transform = `translate(${(window.innerWidth - CW * s) / 2}px, ${(window.innerHeight - H * s) / 2}px) scale(${s})`;
   // Zeichenfläche in Bildschirmauflösung (Bühnen-Skalierung × Pixeldichte), sonst wird alles hochskaliert und unscharf
-  const k = clamp(Math.round(s * (window.devicePixelRatio || 1) * 4) / 4, 1, Touch.detect() ? 2 : 3);
+  const k = clamp(Math.round(s * (window.devicePixelRatio || 1) * 4) / 4, 1, Gfx.maxRK());
   if (k !== RK) {
     RK = k; const cv = $('game'); cv.width = Math.round(CW * k); cv.height = Math.round(H * k);
     const R = Game.race; if (R && Game.state === 'race') cycleCameraRes(R);
@@ -7135,7 +7213,7 @@ window.addEventListener('resize', resize);
 let lastFrame = performance.now();
 function frame(now) {
   const dt = Math.min(0.1, (now - lastFrame) / 1000); lastFrame = now;
-  try { Game.update(dt); Game.render(); Touch.update(); }
+  try { Game.update(dt); Game.render(); Touch.update(); Gfx.watch(dt, Game.state === 'race' && !Game.paused); }
   catch (err) { console.error(err); }
   requestAnimationFrame(frame);
 }

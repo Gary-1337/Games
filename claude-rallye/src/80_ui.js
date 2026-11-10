@@ -354,6 +354,8 @@ const UI = {
           <div class="row"><label class="l">Touch-Steuerung</label>${seg('otouch', ['Automatisch', 'An', 'Aus'], o.touch || 0)}</div>
           <div class="row"><label class="l">Kamera-Zoom (allein)</label>${seg('ocam', ['Aus', 'Folgen', 'Nah'], o.camera != null ? o.camera : 1)}</div>
           <div class="row"><label class="l">Checkpoints zeigen</label>${tog('ocps', o.showCps)}</div>
+          <div class="row"><label class="l">Grafikqualität</label>${seg('ogfx', ['Auto', 'Hoch', 'Mittel', 'Niedrig'], Math.max(0, ['auto', 'high', 'mid', 'low'].indexOf(o.gfx || 'auto')))}</div>
+          <div class="note" style="margin:-2px 0 8px 0">Auto senkt die Qualität selbst, wenn das Spiel ruckelt. Gilt ab dem nächsten Rennen.</div>
         </div>
         <div class="col" style="flex:1"><h3>Steuerung</h3>
           <table class="keytbl"><tr><td></td><td>Gas</td><td>Bremse</td><td>Lenken</td><td>Reset</td><td>Zum Checkpoint</td></tr>
@@ -379,6 +381,7 @@ const UI = {
     else if (act === 'oracemus') o.raceMusic = !o.raceMusic;
     else if (act === 'otouch') o.touch = +v;
     else if (act === 'ocam') o.camera = +v;
+    else if (act === 'ogfx') { o.gfx = ['auto', 'high', 'mid', 'low'][+v]; Gfx.auto = -1; resize(); }
     else if (act === 'ovoice') { o.voiceName = el.value; Speaker.voice = null; Options.save(); const was = o.commentary; o.commentary = true; Speaker.say('Hallo, ich bin dein Kommentator. Und los geht\'s!', 'test', 0, 2); o.commentary = was; return; }
     else if (act === 'ovtest') { const was = o.commentary; o.commentary = true; Speaker.say('Und da ist er! Neuer Streckenrekord! Was für eine Runde!', 'test', 0, 2); o.commentary = was; return; }
     else if (act === 'ocomm') { o.commentary = o.commentary !== true; if (o.commentary) { Options.save(); Speaker.say('Kommentator ist an.', 'test', 1, 2); } else Speaker.stop(); }

@@ -488,6 +488,7 @@ const Game = {
     Options.load();
     bindScreens();
     Touch.init();
+    resize();
     this.newDemo();
     UI.main();
     // Editor-Ereignisse
@@ -683,7 +684,7 @@ function resize() {
   const st = $('stage');
   st.style.transform = `translate(${(window.innerWidth - CW * s) / 2}px, ${(window.innerHeight - H * s) / 2}px) scale(${s})`;
   // Zeichenfläche in Bildschirmauflösung (Bühnen-Skalierung × Pixeldichte), sonst wird alles hochskaliert und unscharf
-  const k = clamp(Math.round(s * (window.devicePixelRatio || 1) * 4) / 4, 1, Touch.detect() ? 2 : 3);
+  const k = clamp(Math.round(s * (window.devicePixelRatio || 1) * 4) / 4, 1, Gfx.maxRK());
   if (k !== RK) {
     RK = k; const cv = $('game'); cv.width = Math.round(CW * k); cv.height = Math.round(H * k);
     const R = Game.race; if (R && Game.state === 'race') cycleCameraRes(R);
@@ -694,7 +695,7 @@ window.addEventListener('resize', resize);
 let lastFrame = performance.now();
 function frame(now) {
   const dt = Math.min(0.1, (now - lastFrame) / 1000); lastFrame = now;
-  try { Game.update(dt); Game.render(); Touch.update(); }
+  try { Game.update(dt); Game.render(); Touch.update(); Gfx.watch(dt, Game.state === 'race' && !Game.paused); }
   catch (err) { console.error(err); }
   requestAnimationFrame(frame);
 }

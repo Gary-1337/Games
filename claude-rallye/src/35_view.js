@@ -697,8 +697,17 @@ function splatTerrain(c, t, F, rs = 1) {
   const WW = W * rs, HH = H * rs, zs = VIEW.ZS * rs;
   const src = F.getContext('2d').getImageData(0, 0, WW, HH).data;
   const img = c.getImageData(0, 0, WW, HH), out = img.data;
+  const src32 = new Uint32Array(src.buffer), out32 = new Uint32Array(out.buffer);   // ganze Pixel in einem Schritt kopieren
   let hRow = new Float32Array(WW), hNext = new Float32Array(WW);
-  const fillRow = (arr, y) => { for (let x = 0; x < WW; x++) arr[x] = terrainH(t, (x + 0.5) / rs, (y + 0.5) / rs); };
+  // Höhenzeile schnell füllen: erst die beiden Rasterzeilen der Höhenkarte mischen, dann quer interpolieren (statt terrainH je Pixel)
+  const hm = t.hm, colH = new Float32Array(HMW), gxs = new Float32Array(WW);
+  for (let x = 0; x < WW; x++) gxs[x] = clamp((x + 0.5) / rs / HM, 0, HMW - 1.001);
+  const fillRow = (arr, y) => {
+    if (!hm) { arr.fill(0); return; }
+    const gy = clamp((y + 0.5) / rs / HM, 0, HMH - 1.001), iy = gy | 0, fy = gy - iy, o = iy * HMW;
+    for (let i = 0; i < HMW; i++) colH[i] = hm[o + i] * (1 - fy) + hm[o + HMW + i] * fy;
+    for (let x = 0; x < WW; x++) { const gx = gxs[x], ix = gx | 0, fx = gx - ix; arr[x] = colH[ix] * (1 - fx) + colH[ix + 1] * fx; }
+  };
   fillRow(hRow, 0);
   for (let y = 0; y < HH; y++) {
     if (y + 1 < HH) fillRow(hNext, y + 1); else hNext.set(hRow);
@@ -708,9 +717,11 @@ function splatTerrain(c, t, F, rs = 1) {
       if (X < 0 || X >= WW) continue;
       const top = py - hRow[x] * zs * s, bot = py1 - hNext[x] * zs * s1;
       const y0 = Math.floor(top), y1 = Math.max(y0 + 1, Math.ceil(bot)), cliff = bot - top - step > 1.5 * rs, edge = top + step + 0.5;
-      const si = (y * WW + x) * 4;
-      for (let Y = Math.max(0, y0); Y < Math.min(HH, y1); Y++) {
-        const k = cliff && Y > edge ? 0.62 - Math.min(0.15, (Y - edge) * 0.01 / rs) : 1, di = (Y * WW + X) * 4;
+      const sp = y * WW + x, si = sp * 4, Ya = y0 < 0 ? 0 : y0, Yb = y1 > HH ? HH : y1;
+      if (!cliff) { const px = src32[sp]; for (let Y = Ya; Y < Yb; Y++) out32[Y * WW + X] = px; continue; }
+      for (let Y = Ya; Y < Yb; Y++) {
+        if (Y <= edge) { out32[Y * WW + X] = src32[sp]; continue; }
+        const k = 0.62 - Math.min(0.15, (Y - edge) * 0.01 / rs), di = (Y * WW + X) * 4;
         out[di] = src[si] * k; out[di + 1] = src[si + 1] * k; out[di + 2] = src[si + 2] * k; out[di + 3] = 255;
       }
     }
@@ -723,7 +734,7 @@ function buildScene(t, rt, opt = {}, wx = { sky: 'clear', time: 'day' }) {
   const theme = THEME_SKY[t.theme] ? t.theme : 'meadow', look = t.look && THEME_SKY[t.look] ? t.look : theme, SC = skyColors(look, wx);
   const RS = opt.rs || 1;          // Auflösung der Bodenebene und Szene (2 für die Zoom-Kamera)
   // 1) Flache Welt: Boden mit Schmutzrändern, Gummispur, Markierungen, Schatten
-  const gr = makeGround(t, true);
+  const gr = cachedGround(t);
   let F = gr.canvas, g = gr.ctx;
   if (RS > 1) {
     // Boden pixelgenau hochrechnen (keine Unschärfe), Linien/Markierungen danach in voller Auflösung

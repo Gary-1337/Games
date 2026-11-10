@@ -72,13 +72,14 @@ function fillGround(t, data, x0, y0, x1, y1, dist) {
   const cellOf = (cx, cy) => g[clamp(cy, 0, GH - 1) * GW + clamp(cx, 0, GW - 1)];
   const c1 = [0, 0, 0], c2 = [0, 0, 0];
   const types = [0, 0, 0, 0], wts = [0, 0, 0, 0];
+  let n = 0;
+  const add = (ty, w) => { for (let k = 0; k < n; k++) if (types[k] === ty) { wts[k] += w; return; } types[n] = ty; wts[n] = w; n++; };
   for (let y = y0; y < y1; y++) {
     const gy = (y + 0.5) / CELL - 0.5, iy = Math.floor(gy), fy = gy - iy;
     for (let x = x0; x < x1; x++) {
       const gx = (x + 0.5) / CELL - 0.5, ix = Math.floor(gx), fx = gx - ix;
       // Gewichte der vier umliegenden Zellen nach Typ zusammenfassen
-      let n = 0;
-      const add = (ty, w) => { for (let k = 0; k < n; k++) if (types[k] === ty) { wts[k] += w; return; } types[n] = ty; wts[n] = w; n++; };
+      n = 0;
       add(cellOf(ix, iy), (1 - fx) * (1 - fy)); add(cellOf(ix + 1, iy), fx * (1 - fy));
       add(cellOf(ix, iy + 1), (1 - fx) * fy); add(cellOf(ix + 1, iy + 1), fx * fy);
       let d = 0, d2 = -1;
@@ -147,6 +148,27 @@ function makeGround(t, withDirt) {
   fillGround(t, img.data, 0, 0, W, H, withDirt ? { out: trackDistanceField(t), inn: insideDistanceField(t) } : null);
   g.putImageData(img, 0, 0);
   return { canvas: c, ctx: g, img };
+}
+/** Boden mit Schmutzrändern aus dem Zwischenspeicher (hängt nur von Raster, Höhen und Stil ab – nicht vom Wetter).
+ *  Liefert immer eine frische Zeichenfläche, weil die Szene darauf weiterzeichnet. */
+const groundCache = [];
+function groundKey(t) {
+  let h = 2166136261 >>> 0;
+  const g = t.grid; for (let i = 0; i < g.length; i++) h = Math.imul(h ^ g[i], 16777619);
+  if (t.hm) { const v = new Int32Array(t.hm.buffer, t.hm.byteOffset, t.hm.length); for (let i = 0; i < v.length; i++) h = Math.imul(h ^ v[i], 16777619); }
+  return t.theme + ':' + (h >>> 0);
+}
+function cachedGround(t) {
+  const key = groundKey(t);
+  let e = groundCache.find(c => c.key === key);
+  if (!e) {
+    const img = new ImageData(W, H);
+    fillGround(t, img.data, 0, 0, W, H, { out: trackDistanceField(t), inn: insideDistanceField(t) });
+    e = { key, img }; groundCache.push(e); if (groundCache.length > 4) groundCache.shift();
+  } else { groundCache.splice(groundCache.indexOf(e), 1); groundCache.push(e); }
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d'); g.putImageData(e.img, 0, 0);
+  return { canvas: c, ctx: g };
 }
 /** Aktualisiert einen Bodenbereich (Editor). */
 function updateGround(gr, t, x0, y0, x1, y1) {
