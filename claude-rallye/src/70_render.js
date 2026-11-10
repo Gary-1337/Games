@@ -107,6 +107,7 @@ function updateCamera(race) {
 }
 function drawRace(ctx, race) {
   const cam = updateCamera(race);
+  CAR_DETAIL = (cam ? cam.z : 1) * RK >= 1.6 && Gfx.level() > 0 ? 1 : 0;
   if (cam) {
     // Welt direkt vergrößert zeichnen (Vektorgrafik bleibt scharf, Szene liegt in doppelter Auflösung vor)
     ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip();

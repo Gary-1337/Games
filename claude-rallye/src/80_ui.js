@@ -216,7 +216,7 @@ const UI = {
           const z = terrainH(tsrc, x, y);
           return { x, y, a, z, gz: z, color: r.col, shape: r.shape, steer: 0, damage: 0, alpha: 1, level: 0 };
         }).sort((p, q) => p.y - q.y);
-        for (const o of items) drawCar3D(g, o);
+        CAR_DETAIL = 0; for (const o of items) drawCar3D(g, o); CAR_DETAIL = 1;
         g.setTransform(1, 0, 0, 1, 0, 0);
       }
       for (const c of cars) {

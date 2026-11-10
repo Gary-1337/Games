@@ -4,6 +4,19 @@ Top-Down-Arcade-Rennspiel in einer einzigen Datei (HTML5 + Canvas + JavaScript).
 Die aktuelle Version liegt immer in `index.html`. Die Versionsnummer steht unten rechts im Hauptmenü.
 Unter `versions/` liegen höchstens 3 Versionsstände, ältere werden gelöscht (sie bleiben in der Git-Historie abrufbar). **Rollback:** gewünschte Datei aus `versions/` als `index.html` verwenden. Alle Änderungen sind hier dokumentiert.
 
+## 1.9.0 (10.11.2026)
+Neue Automodelle und überarbeitete Streckengrafik.
+- **Autos als echte 3D-Modelle:** Alle 10 Fahrzeugklassen sind neu gebaut. Statt Quadern haben sie geformte Karosserien mit schräger Haube, geneigten Scheiben, Dachsäulen, Radhäusern, runden Rädern mit Felgen (Speichen drehen sich beim Fahren), Scheinwerfern, Rückleuchten, Spiegeln und klassentypischen Anbauteilen (Heckflügel, Überrollkäfig, Lichtleiste, Ladefläche, Kofferaufbau, Fahrer mit Helm …).
+- **Beleuchtung der Autos:** Jede Fläche wird je nach Fahrtrichtung beleuchtet (Sonne von links hinten), der Lack bekommt Glanzlichter, im Glas spiegelt sich der Himmel. Dazu ein weicher Wurfschatten und ein Kontaktschatten unter dem Wagen.
+- **Runde Streckenkanten:** Fahrbahn-, Curb- und Uferränder werden geglättet statt in 4-Pixel-Stufen gezeichnet.
+- **Curbs** laufen jetzt rot-weiß quer zur Fahrtrichtung statt als schräges Muster.
+- **Neue Bodentexturen:** Rasen mit hellen und dunklen Flecken und weichen Mähstreifen, feinkörniger Asphalt mit feinen Rissen, ruhigerer Kies, Schneeverwehungen, Wasser mit Tiefenzonen und Wellenkämmen, Betonplatten mit Fugen.
+- **Kleinteile am Streckenrand:** Grasbüschel, Blumen, Steine und Schneewehen – als Vektorgrafik, deshalb auch im Zoom scharf. Auf Schotterstrecken eingefahrene Fahrspuren.
+- **Zoom-Kamera:** Der Boden wird weich hochgerechnet und mit feinem Korn überlagert (vorher sichtbare Klötzchen).
+- **Bäume:** Laubkronen aus zwei Ebenen mit Licht- und Schattenseite, vier Grüntöne; Tannen mit schattierten Etagen und Schnee.
+- **Himmel und Licht:** Sonne mit Schein, Wolken je nach Wetter und Tageszeit, weiche Objektschatten, warmes Sonnenlicht im Bild.
+- **Leistung:** Der Streckenaufbau beim Laden dauert länger als in 1.8.0 (gemessen ohne Grafikkarte etwa 0,9 s statt 0,5 s bei doppelter Auflösung). Die Autos kosten je Bild etwas mehr Rechenzeit (rund 100 statt 40 Zeichenschritte je Auto).
+
 ## 1.8.0 (10.11.2026)
 Überarbeitung: schneller und drei neue Spielelemente.
 - **Leistung:** Ein Bild braucht rund halb so viel Rechenzeit (gemessen ohne Grafikkarte 24 → 11 ms). Gezeichnet wird nur noch der sichtbare Ausschnitt, Objekte und Autos außerhalb des Bildes werden übersprungen, Bremsspuren liegen direkt in der Streckengrafik statt in einer eigenen Ebene (sie überstehen einen Zoomwechsel).

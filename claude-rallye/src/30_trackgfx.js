@@ -1,6 +1,8 @@
 /* =====================================================================
    6  STRECKEN-GRAFIK
    ===================================================================== */
+let SURF_TILE = false;     // true beim Erzeugen der Umland-Kachel: keine großflächigen Muster (sonst sichtbare Wiederholung)
+let CURB_ON = -1;          // Curb-Streifen: -1 = unbekannt (schräges Muster), 0 = weiß, 1 = rot
 /** Prozedurale Farbe einer Oberfläche an Pixel (x,y). out = [r,g,b] */
 function surfColor(s, x, y, theme, out) {
   const sf = SURF[s];
@@ -8,44 +10,67 @@ function surfColor(s, x, y, theme, out) {
   let r = sf.col[0], g = sf.col[1], b = sf.col[2], k = nz * sf.vr + big * sf.vr * 1.3;
   switch (s) {
     case S.ASPHALT: {
-      k = nz * 8 + big * 9 + (vnoise(x, y, 7) - 0.5) * 6;
+      // feinkörnig, großflächig leicht fleckig, vereinzelt feine Risse (Höhenlinien eines Rauschfelds)
+      const mac = SURF_TILE ? 0 : vnoise(x + 900, y, 70) - 0.5;
+      k = nz * 5 + big * 6 + mac * 10 + (vnoise(x, y, 5) - 0.5) * 5;
       const sp = hash2(x >> 1, y >> 1);
-      if (sp > 0.975) k += 16; else if (sp < 0.02) k -= 12;
+      if (sp > 0.985) k += 11; else if (sp < 0.012) k -= 9;
+      if (!SURF_TILE && Math.abs(vnoise(x + 311, y + 97, 34) - 0.5) < 0.004 && vnoise(x, y + 500, 90) > 0.64) k -= 10;
+      b += 2;
       break;
     }
-    case S.PIT: k = nz * 6 + big * 5; break;
+    case S.PIT: k = nz * 5 + big * 5; if (((x >> 5) + (y >> 5)) & 1) k -= 1.5; break;
     case S.CURB: {
-      const on = (((x + y) >> 3) & 1) === 1;
-      if (on) { r = 238; g = 238; b = 236; }
-      k = nz * 5;
+      const on = CURB_ON >= 0 ? CURB_ON === 1 : (((x + y) >> 3) & 1) === 0;
+      if (!on) { r = 240; g = 240; b = 236; }
+      k = nz * 5 + big * 6;
       break;
     }
     case S.GRASS: {
       if (theme === 'city') { r -= 6; g -= 8; b -= 2; }
-      k += (((x + y * 0.3) >> 5) & 1) ? 6 : -6;                 // Mähstreifen
+      // Flecken von saftig-dunkel bis trocken-gelblich, weiche Mähstreifen, einzelne Halme
+      const mac = SURF_TILE ? 0 : vnoise(x + 200, y + 77, 85) - 0.5, mid = vnoise(x + 50, y, 11) - 0.5;
+      r += mac * 36 + mid * 8; g += mac * 12 + mid * 13; b += mid * 3 - mac * 8;
+      k = nz * 6 + big * 9 + clamp(Math.sin((x + y * 0.3 + Math.sin(y * 0.021) * 9) * 0.098) * 4, -1, 1) * 3.6;
       const h = hash2(x * 3 + 7, y * 5 + 1);
-      if (h > 0.93) k += 14; else if (h < 0.06) k -= 16;        // Grashalme
+      if (h > 0.95) k += 9; else if (h < 0.05) k -= 11;
       if (h > 0.9988 && theme !== 'city') { r = 250; g = 240; b = 120; k = 0; }   // Blümchen
       else if (h < 0.0008) { r = 250; g = 250; b = 250; k = 0; }
       break;
     }
     case S.SAND: {
-      k += Math.sin(x * 0.13 + Math.sin(y * 0.045) * 3) * 6 + Math.sin(x * 0.031 - y * 0.02) * 4;
-      if (hash2(x, y) > 0.985) k -= 22;
+      const mac = SURF_TILE ? 0 : vnoise(x + 31, y + 410, 70) - 0.5;
+      r += mac * 16; g += mac * 14; b += mac * 6;
+      k = nz * 7 + big * 9 + Math.sin(x * 0.13 + Math.sin(y * 0.045) * 3) * 5 + Math.sin(x * 0.031 - y * 0.02) * 4;
+      if (hash2(x >> 1, y >> 1) > 0.99) k -= 16;
       break;
     }
     case S.GRAVEL: {
-      const st = hash2(x >> 1, y >> 1);
-      k = (st - 0.5) * 52 + nz * 12;
-      if (st > 0.96) { r = 200; g = 192; b = 178; }
+      const st = hash2(x >> 1, y >> 1), st2 = hash2(((x + 1) / 3) | 0, ((y + 2) / 3) | 0);
+      k = (st - 0.5) * 26 + (st2 - 0.5) * 18 + nz * 7 + big * 12;
+      if (st > 0.965) { r = 198; g = 192; b = 180; k *= 0.4; } else if (st2 < 0.05) k -= 14;
+      break;
+    }
+    case S.DIRT: {
+      const mac = SURF_TILE ? 0 : vnoise(x + 70, y + 20, 48) - 0.5, st = hash2(x >> 1, y >> 1);
+      k = nz * 8 + big * 13 + mac * 15;
+      if (st > 0.978) { r = 178; g = 162; b = 140; k = 0; } else if (st < 0.03) k -= 13;
+      break;
+    }
+    case S.CONCRETE: {
+      k = nz * 6 + big * 8 + (SURF_TILE ? 0 : (vnoise(x + 5, y + 800, 60) - 0.5) * 12);
+      if (x % 44 === 0 || y % 44 === 0) k -= 16;                                   // Plattenfugen
       break;
     }
     case S.SNOW: {
-      k += Math.sin(x * 0.05 + y * 0.02) * 2 + (vnoise(x, y, 11) - 0.5) * 6; b += 4;
+      // weiche Verwehungen mit bläulichen Schatten
+      const dr = SURF_TILE ? 0 : vnoise(x, y + 300, 44) - 0.5;
+      r += dr * 16; g += dr * 11; b += dr * 3 + 4;
+      k = nz * 4 + Math.sin(x * 0.05 + y * 0.02) * 2 + (vnoise(x, y, 11) - 0.5) * 6;
       if (hash2(x, y) > 0.997) k += 18;                          // Glitzern
       break;
     }
-    case S.ICE: k += Math.sin((x - y) * 0.07) * 6 + (hash2(x, y >> 2) > 0.985 ? 30 : 0) + (vnoise(x, y, 18) - 0.5) * 12; break;
+    case S.ICE: k += Math.sin((x - y) * 0.07) * 6 + (hash2(x, y >> 2) > 0.985 ? 30 : 0) + (vnoise(x, y, 18) - 0.5) * 12; if (Math.abs(vnoise(x + 77, y + 13, 30) - 0.5) < 0.008) k += 26; break;
     case S.LAVA: {
       // glühende Lava mit dunkler Kruste
       const cr = vnoise(x, y, 9) + (vnoise(x + 300, y, 22) - 0.5) * 0.6;
@@ -55,7 +80,13 @@ function surfColor(s, x, y, theme, out) {
     }
     case S.ASH: { k += (hash2(x >> 1, y >> 1) - 0.5) * 18; if (hash2(x, y) > 0.992) { r = 120; g = 60; b = 40; k = 0; } break; }
     case S.OIL: { const sh = Math.sin(x * 0.21 + y * 0.13) * 0.5 + 0.5; r = 26 + sh * 30; g = 24 + sh * 14 + (1 - sh) * 22; b = 34 + (1 - sh) * 40; k = nz * 4; break; }
-    case S.WATER: k += Math.sin(x * 0.07 + Math.sin(y * 0.05) * 2) * 8 + Math.sin(y * 0.11 + x * 0.02) * 5; break;
+    case S.WATER: {
+      // tiefere und flachere Zonen, Wellenkämme
+      const dp = SURF_TILE ? 0 : vnoise(x + 40, y, 64) - 0.5, wv = Math.sin(x * 0.09 + Math.sin(y * 0.07) * 2.5 + y * 0.03);
+      r -= dp * 16; g += dp * 22; b += dp * 14;
+      k = nz * 4 + Math.sin(x * 0.07 + Math.sin(y * 0.05) * 2) * 6 + Math.sin(y * 0.11 + x * 0.02) * 4 + (wv > 0.975 ? 20 : 0);
+      break;
+    }
   }
   out[0] = r + k; out[1] = g + k; out[2] = b + k;
   return out;
@@ -71,21 +102,44 @@ function fillGround(t, data, x0, y0, x1, y1, dist) {
   x0 = clamp(x0 | 0, 0, W); x1 = clamp(Math.ceil(x1), 0, W); y0 = clamp(y0 | 0, 0, H); y1 = clamp(Math.ceil(y1), 0, H);
   const cellOf = (cx, cy) => g[clamp(cy, 0, GH - 1) * GW + clamp(cx, 0, GW - 1)];
   const c1 = [0, 0, 0], c2 = [0, 0, 0];
-  const types = [0, 0, 0, 0], wts = [0, 0, 0, 0];
+  const types = new Array(16).fill(0), wts = new Array(16).fill(0);
   let n = 0;
+  const crt = dist && dist.rt && dist.rt.cum ? dist.rt : null, curbI = crt ? new Int32Array(GW * GH).fill(-1) : null;
   const add = (ty, w) => { for (let k = 0; k < n; k++) if (types[k] === ty) { wts[k] += w; return; } types[n] = ty; wts[n] = w; n++; };
+  // Zellen, deren 5×5-Umgebung einheitlich ist, brauchen keine Mischung (schneller Weg für die große Fläche)
+  const uni = new Uint8Array(GW * GH);
+  for (let cy = 0; cy < GH; cy++) for (let cx = 0; cx < GW; cx++) {
+    const v = g[cy * GW + cx]; let same = 1;
+    for (let dy = -2; dy <= 2 && same; dy++) for (let dx = -2; dx <= 2; dx++) if (cellOf(cx + dx, cy + dy) !== v) { same = 0; break; }
+    uni[cy * GW + cx] = same;
+  }
+  const wy4 = [0, 0, 0, 0], wx4 = [0, 0, 0, 0];
+  const bs = (f, o) => { const f2 = f * f, f3 = f2 * f; o[0] = (1 - 3 * f + 3 * f2 - f3) / 6; o[1] = (3 * f3 - 6 * f2 + 4) / 6; o[2] = (-3 * f3 + 3 * f2 + 3 * f + 1) / 6; o[3] = f3 / 6; };
   for (let y = y0; y < y1; y++) {
-    const gy = (y + 0.5) / CELL - 0.5, iy = Math.floor(gy), fy = gy - iy;
+    // kubischer B-Spline über 4×4 Zellen: glättet die Rasterkanten zu runden Konturen
+    const gy = (y + 0.5) / CELL - 0.5, iy = Math.floor(gy);
+    bs(gy - iy, wy4);
+    const cyc = clamp(Math.round(gy), 0, GH - 1);
     for (let x = x0; x < x1; x++) {
-      const gx = (x + 0.5) / CELL - 0.5, ix = Math.floor(gx), fx = gx - ix;
-      // Gewichte der vier umliegenden Zellen nach Typ zusammenfassen
+      const gx = (x + 0.5) / CELL - 0.5, ix = Math.floor(gx), ui = cyc * GW + clamp(Math.round(gx), 0, GW - 1);
       n = 0;
-      add(cellOf(ix, iy), (1 - fx) * (1 - fy)); add(cellOf(ix + 1, iy), fx * (1 - fy));
-      add(cellOf(ix, iy + 1), (1 - fx) * fy); add(cellOf(ix + 1, iy + 1), fx * fy);
+      if (uni[ui]) { types[0] = g[ui]; wts[0] = 1; n = 1; }
+      else {
+        bs(gx - ix, wx4);
+        for (let dy = 0; dy < 4; dy++) for (let dx = 0; dx < 4; dx++) add(cellOf(ix + dx - 1, iy + dy - 1), wx4[dx] * wy4[dy]);
+      }
       let d = 0, d2 = -1;
       for (let k = 1; k < n; k++) if (wts[k] > wts[d]) d = k;
       for (let k = 0; k < n; k++) if (k !== d && (d2 < 0 || wts[k] > wts[d2])) d2 = k;
       const sd = types[d];
+      if (curbI && (sd === S.CURB || (d2 >= 0 && types[d2] === S.CURB))) {
+        // Streifen quer zur Fahrtrichtung: Lage entlang der Ideallinie
+        const ci = clamp(Math.floor(y / CELL), 0, GH - 1) * GW + clamp(Math.floor(x / CELL), 0, GW - 1);
+        let li = curbI[ci];
+        if (li < 0) { let best = 1e18; for (let q = 0; q < crt.n; q += 2) { const dd = (crt.lx[q] - x) * (crt.lx[q] - x) + (crt.ly[q] - y) * (crt.ly[q] - y); if (dd < best) { best = dd; li = q; } } curbI[ci] = li; }
+        const sAlong = crt.cum[li] + (x - crt.lx[li]) * crt.tx[li] + (y - crt.ly[li]) * crt.ty[li];
+        CURB_ON = (Math.floor(sAlong / 9) & 1);
+      } else CURB_ON = -1;
       surfColor(sd, x, y, theme, c1);
       let r = c1[0], gg = c1[1], b = c1[2];
       if (d2 >= 0) {
@@ -158,17 +212,18 @@ function groundKey(t) {
   if (t.hm) { const v = new Int32Array(t.hm.buffer, t.hm.byteOffset, t.hm.length); for (let i = 0; i < v.length; i++) h = Math.imul(h ^ v[i], 16777619); }
   return t.theme + ':' + (h >>> 0);
 }
-function cachedGround(t) {
-  const key = groundKey(t);
+function cachedGround(t, rt) {
+  const key = groundKey(t) + (rt ? 'r' : '');
   let e = groundCache.find(c => c.key === key);
   if (!e) {
-    const img = new ImageData(W, H);
-    fillGround(t, img.data, 0, 0, W, H, { out: trackDistanceField(t), inn: insideDistanceField(t) });
-    e = { key, img }; groundCache.push(e); if (groundCache.length > 4) groundCache.shift();
+    const img = new ImageData(W, H), out = trackDistanceField(t);
+    fillGround(t, img.data, 0, 0, W, H, { out, inn: insideDistanceField(t), rt });
+    CURB_ON = -1;
+    e = { key, img, out }; groundCache.push(e); if (groundCache.length > 4) groundCache.shift();
   } else { groundCache.splice(groundCache.indexOf(e), 1); groundCache.push(e); }
   const c = document.createElement('canvas'); c.width = W; c.height = H;
   const g = c.getContext('2d'); g.putImageData(e.img, 0, 0);
-  return { canvas: c, ctx: g };
+  return { canvas: c, ctx: g, out: e.out };
 }
 /** Aktualisiert einen Bodenbereich (Editor). */
 function updateGround(gr, t, x0, y0, x1, y1) {

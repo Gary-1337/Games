@@ -80,41 +80,52 @@ const spriteCache = new Map();
 function sprite(key, r, fn) {
   let c = spriteCache.get(key);
   if (!c) {
-    const sz = Math.ceil(r * 2 * 2 + 4);
+    const sz = Math.ceil(r * 2 * 3 + 6);
     c = document.createElement('canvas'); c.width = c.height = sz;
-    const g = c.getContext('2d'); g.translate(sz / 2, sz / 2); g.scale(2, 2);
+    const g = c.getContext('2d'); g.translate(sz / 2, sz / 2); g.scale(3, 3);
     fn(g, r); spriteCache.set(key, c);
   }
   return c;
 }
 function drawSprite(ctx, spr, x, y, z) {
-  const [X, Y] = P(x, y, z), s = projS(y), w = spr.width / 2 * s;
+  const [X, Y] = P(x, y, z), s = projS(y), w = spr.width / 3 * s;
   ctx.drawImage(spr, X - w / 2, Y - w / 2, w, w);
 }
-function canopySprite(theme, r, v) {
-  return sprite('can' + theme + Math.round(r) + '_' + v, r, (g, r) => {
-    const base = theme === 'city' ? [47, 108, 54] : theme === 'desert' ? [74, 140, 60] : [52, 126, 50];
-    const rng = mulberry32(v * 97 + Math.round(r));
-    g.fillStyle = mul(base, 0.6); g.beginPath(); g.arc(0.5, 1, r, 0, 7); g.fill();
-    for (let i = 0; i < 7; i++) {
-      const a = rng() * 6.28, d = r * 0.45 * rng(), rr = r * (0.45 + rng() * 0.25);
-      const gr = g.createRadialGradient(Math.cos(a) * d - rr * 0.3, Math.sin(a) * d - rr * 0.35, rr * 0.1, Math.cos(a) * d, Math.sin(a) * d, rr);
-      gr.addColorStop(0, mul(base, 1.45)); gr.addColorStop(0.6, mul(base, 1.05)); gr.addColorStop(1, mul(base, 0.72));
-      g.fillStyle = gr; g.beginPath(); g.arc(Math.cos(a) * d, Math.sin(a) * d, rr, 0, 7); g.fill();
+/** Laubkrone von oben: viele Blattbüschel, links oben im Licht, rechts unten im Schatten. layer 0 = unten/dunkel, 1 = Spitze/hell */
+function canopySprite(theme, r, v, layer = 0) {
+  return sprite('can' + theme + Math.round(r * 2) + '_' + v + '_' + layer, r, (g, r) => {
+    const hues = theme === 'city' ? [[47, 108, 54], [58, 112, 50], [42, 98, 60]] : theme === 'desert' ? [[74, 140, 60], [96, 142, 58], [70, 128, 66]] : [[50, 124, 48], [72, 134, 44], [40, 110, 58], [86, 138, 50]];
+    const base = hues[v % hues.length].map(c => c * (layer ? 1.12 : 0.92));
+    const rng = mulberry32(v * 97 + Math.round(r) + layer * 13);
+    if (!layer) { g.fillStyle = mul(base, 0.5); g.beginPath(); g.arc(0.7, 1.2, r * 0.96, 0, 7); g.fill(); }
+    // Büschel: zuerst die schattigen (rechts unten), zuletzt die hellen (links oben)
+    const lobes = [];
+    for (let i = 0; i < 11; i++) { const a = rng() * 6.283, d = r * (0.15 + 0.5 * rng()); lobes.push([Math.cos(a) * d, Math.sin(a) * d, r * (0.3 + rng() * 0.2)]); }
+    lobes.sort((p, q) => (q[0] + q[1]) - (p[0] + p[1]));
+    for (const [x, y, rr] of lobes) {
+      const lit = clamp(0.5 - (x + y) / (r * 1.6), 0, 1);
+      const gr = g.createRadialGradient(x - rr * 0.35, y - rr * 0.4, rr * 0.05, x, y, rr);
+      gr.addColorStop(0, mul([base[0] + 26, base[1] + 14, base[2]], 0.95 + lit * 0.6)); gr.addColorStop(0.55, mul(base, 0.8 + lit * 0.38)); gr.addColorStop(1, mul(base, 0.52 + lit * 0.24));
+      g.fillStyle = gr; g.beginPath(); g.arc(x, y, rr, 0, 7); g.fill();
     }
-    for (let i = 0; i < 14; i++) { const a = rng() * 6.28, d = r * 0.8 * rng(); g.fillStyle = 'rgba(255,255,220,' + (0.08 + rng() * 0.1) + ')'; g.beginPath(); g.arc(Math.cos(a) * d - r * 0.15, Math.sin(a) * d - r * 0.2, 1 + rng() * 1.5, 0, 7); g.fill(); }
+    // Blätter: helle Tupfer im Licht, dunkle im Schatten
+    for (let i = 0; i < 46; i++) {
+      const a = rng() * 6.283, d = r * 0.82 * Math.sqrt(rng()), x = Math.cos(a) * d, y = Math.sin(a) * d, lit = (x + y) < 0;
+      g.fillStyle = lit ? 'rgba(236,250,170,' + (0.10 + rng() * 0.16) + ')' : 'rgba(8,40,20,' + (0.05 + rng() * 0.09) + ')';
+      g.beginPath(); g.ellipse(x, y, 0.5 + rng() * 0.9, 0.35 + rng() * 0.5, rng() * 3, 0, 7); g.fill();
+    }
   });
 }
 function pineSprite(r, layer) {
-  return sprite('pine' + Math.round(r) + '_' + layer, r, (g, r) => {
-    const cols = [[30, 74, 50], [38, 92, 62], [48, 110, 74]][layer];
-    const k = 9;
-    g.fillStyle = mul(cols, 0.75); g.beginPath();
-    for (let i = 0; i <= k * 2; i++) { const a = i / (k * 2) * Math.PI * 2, q = i % 2 ? r * 0.6 : r; g.lineTo(Math.cos(a) * q + 0.6, Math.sin(a) * q + 0.8); } g.fill();
-    g.fillStyle = mul(cols, 1); g.beginPath();
-    for (let i = 0; i <= k * 2; i++) { const a = i / (k * 2) * Math.PI * 2, q = i % 2 ? r * 0.58 : r * 0.96; g.lineTo(Math.cos(a) * q, Math.sin(a) * q); } g.fill();
-    g.fillStyle = 'rgba(255,255,255,.88)';
-    for (let i = 0; i < k; i++) { const a = i / k * Math.PI * 2 + 0.2; g.beginPath(); g.ellipse(Math.cos(a) * r * 0.62, Math.sin(a) * r * 0.62 - 0.5, r * 0.16, r * 0.1, a, 0, 7); g.fill(); }
+  return sprite('pine' + Math.round(r * 2) + '_' + layer, r, (g, r) => {
+    const cols = [[26, 66, 46], [34, 84, 58], [46, 104, 72]][layer];
+    const k = 9, star = (rad, inner, ox, oy) => { g.beginPath(); for (let i = 0; i <= k * 2; i++) { const a = i / (k * 2) * Math.PI * 2 + layer * 0.35, q = i % 2 ? rad * inner : rad; g.lineTo(Math.cos(a) * q + ox, Math.sin(a) * q + oy); } g.fill(); };
+    g.fillStyle = mul(cols, 0.6); star(r, 0.6, 0.7, 1);
+    const gr = g.createLinearGradient(-r, -r, r, r); gr.addColorStop(0, mul(cols, 1.35)); gr.addColorStop(0.5, mul(cols, 1)); gr.addColorStop(1, mul(cols, 0.68));
+    g.fillStyle = gr; star(r * 0.96, 0.58, 0, 0);
+    // Schnee auf den Astspitzen, im Licht kräftiger
+    for (let i = 0; i < k; i++) { const a = i / k * Math.PI * 2 + layer * 0.35, lit = Math.cos(a) + Math.sin(a) < 0.2; g.fillStyle = lit ? 'rgba(255,255,255,.94)' : 'rgba(206,222,244,.86)'; g.beginPath(); g.ellipse(Math.cos(a) * r * 0.64, Math.sin(a) * r * 0.64 - 0.4, r * 0.19, r * 0.11, a, 0, 7); g.fill(); }
+    if (layer === 2) { g.fillStyle = 'rgba(255,255,255,.95)'; g.beginPath(); g.arc(-0.3, -0.3, r * 0.3, 0, 7); g.fill(); }
   });
 }
 function palmSprite(r) {
@@ -211,7 +222,8 @@ function drawObject3D(ctx, o, theme, time) {
         drawSprite(ctx, palmSprite(r), o.x + 2, o.y - 1, top);
       } else {
         prism(ctx, toWorld(circleLoc(Math.max(2.2, o.w * 0.09), 6), o.x, o.y, 0), 0, o.w * 0.5, [96, 66, 40], [96, 66, 40]);
-        drawSprite(ctx, canopySprite(theme, r, seed % 4), o.x, o.y, o.w * 0.78);
+        drawSprite(ctx, canopySprite(theme, r, seed % 4, 0), o.x, o.y, o.w * 0.72);
+        drawSprite(ctx, canopySprite(theme, r * 0.62, seed % 4, 1), o.x - r * 0.1, o.y - r * 0.06, o.w * 1.0);
       }
       break;
     }
@@ -456,205 +468,6 @@ function drawStand(ctx, o, seed) {
   ctx.globalAlpha = 1;
 }
 
-/* ---------- Autos mit Höhe ----------
-   Alle Maße lokal: +x = vorne, +y = rechts, z = Höhe. */
-const CAR3D = {
-  coupe: {
-    body: cw([[12, -4.6], [11, -6], [-11, -6], [-12, -4.6], [-12, 4.6], [-11, 6], [11, 6], [12, 4.6]]), z: [1.6, 6],
-    cabin: cw([[6, -4.6], [-6, -4.8], [-8.5, -4.3], [-8.5, 4.3], [-6, 4.8], [6, 4.6], [7.6, 3.6], [7.6, -3.6]]), cz: 10,
-    roof: cw([[4.6, -3.6], [-6, -3.8], [-7.6, -3.4], [-7.6, 3.4], [-6, 3.8], [4.6, 3.6], [5.6, 2.8], [5.6, -2.8]]),
-    wheels: [[7, -5.4], [7, 5.4], [-7, -5.4], [-7, 5.4]], wsz: [3, 1.6, 4.2], front: 12, rear: -12, lightY: [2.6, 4.6], stripe: true
-  },
-  wedge: {
-    body: cw([[13, 0], [8, -5.2], [-10, -6], [-12.5, -5], [-12.5, 5], [-10, 6], [8, 5.2]]), z: [1.4, 4.6],
-    cabin: cw([[4, -2.7], [-4, -3.1], [-6.5, 0], [-4, 3.1], [4, 2.7], [6, 0]]), cz: 7.2,
-    roof: null, wheels: [[7, -5.6], [7, 5.6], [-8, -5.8], [-8, 5.8]], wsz: [3.2, 1.7, 4], front: 13, rear: -12.5, lightY: [1.5, 4], wing: true, stripe: true
-  },
-  buggy: {
-    body: cw([[10, -4.2], [9, -5.4], [-9, -5.4], [-10, -4.2], [-10, 4.2], [-9, 5.4], [9, 5.4], [10, 4.2]]), z: [3, 6.8],
-    cabin: cw([[3, -3.4], [-5, -3.4], [-5, 3.4], [3, 3.4]]), cz: 7.6,
-    roof: null, wheels: [[6.8, -7.2], [6.8, 7.2], [-6.8, -7.2], [-6.8, 7.2]], wsz: [3.8, 2.2, 6.2], front: 10, rear: -10, lightY: [2, 4], cage: true
-  },
-  rally: {
-    body: cw([[11, -4.4], [10, -5.8], [-10, -5.8], [-11, -4.6], [-11, 4.6], [-10, 5.8], [10, 5.8], [11, 4.4]]), z: [2.2, 7],
-    cabin: cw([[4.5, -4.6], [-7.5, -4.8], [-9, -4.2], [-9, 4.2], [-7.5, 4.8], [4.5, 4.6], [6.4, 3.4], [6.4, -3.4]]), cz: 11.2,
-    roof: cw([[3.4, -3.6], [-7, -3.8], [-8.2, -3.3], [-8.2, 3.3], [-7, 3.8], [3.4, 3.6], [4.4, 2.8], [4.4, -2.8]]),
-    wheels: [[6.6, -5.5], [6.6, 5.5], [-6.8, -5.5], [-6.8, 5.5]], wsz: [3.2, 1.8, 5], front: 11, rear: -11, lightY: [2.4, 4.4], scoop: true, flaps: true, pods: true
-  },
-  formula: {
-    body: cw([[15, -1.4], [9, -2.4], [2, -3.2], [-3, -5.2], [-10, -5.2], [-12, -3.6], [-12, 3.6], [-10, 5.2], [-3, 5.2], [2, 3.2], [9, 2.4], [15, 1.4]]), z: [1.2, 4.4],
-    cabin: null, roof: null, wheels: [[8.5, -7.3], [8.5, 7.3], [-8, -7.6], [-8, 7.6]], wsz: [3.2, 2.1, 5.2], front: 15, rear: -12, lightY: [0.4, 1.2],
-    fwing: true, rwing: true, helmet: [-1, 6.6]
-  },
-  pickup: {
-    body: cw([[11, -5], [10, -6.4], [-11, -6.4], [-11.5, -5.6], [-11.5, 5.6], [-11, 6.4], [10, 6.4], [11, 5]]), z: [3, 8],
-    cabin: cw([[5, -5.4], [-2, -5.6], [-3, -5], [-3, 5], [-2, 5.6], [5, 5.4], [6.4, 4.2], [6.4, -4.2]]), cz: 13,
-    roof: cw([[3.6, -4.6], [-2, -4.8], [-2.4, -4.4], [-2.4, 4.4], [-2, 4.8], [3.6, 4.6], [4.4, 3.8], [4.4, -3.8]]),
-    wheels: [[7, -6.4], [7, 6.4], [-7.4, -6.4], [-7.4, 6.4]], wsz: [3.6, 2, 6], front: 11, rear: -11.5, lightY: [3, 5.2], bed: true, bars: true
-  },
-  truck: {
-    body: cw([[15, -6], [14, -7.4], [-15, -7.4], [-15.5, -6.8], [-15.5, 6.8], [-15, 7.4], [14, 7.4], [15, 6]]), z: [3.5, 8],
-    cabin: cw([[14.5, -6.8], [6, -6.8], [6, 6.8], [14.5, 6.8]]), cz: 16,
-    roof: cw([[13.4, -6.2], [6.4, -6.2], [6.4, 6.2], [13.4, 6.2]]),
-    wheels: [[10, -7.2], [10, 7.2], [-6, -7.4], [-6, 7.4], [-11, -7.4], [-11, 7.4]], wsz: [3.8, 2.2, 7], front: 15, rear: -15.5, lightY: [3.5, 6], cargo: true
-  },
-  muscle: {
-    body: cw([[13, -5], [12, -6.4], [-12, -6.4], [-13, -5.2], [-13, 5.2], [-12, 6.4], [12, 6.4], [13, 5]]), z: [1.6, 6],
-    cabin: cw([[2, -4.8], [-6.5, -5], [-9, -4.4], [-9, 4.4], [-6.5, 5], [2, 4.8], [3.8, 3.8], [3.8, -3.8]]), cz: 9.6,
-    roof: cw([[0.6, -3.8], [-6, -4], [-8, -3.5], [-8, 3.5], [-6, 4], [0.6, 3.8], [1.8, 3], [1.8, -3]]),
-    wheels: [[8, -5.8], [8, 5.8], [-7.6, -6], [-7.6, 6]], wsz: [3.2, 1.9, 4.6], front: 13, rear: -13, lightY: [2.4, 5], twin: true, hoodScoop: true
-  },
-  ev: {
-    body: cw([[12.5, -2.5], [11.5, -5], [8, -6], [-10, -6], [-12, -4.6], [-12, 4.6], [-10, 6], [8, 6], [11.5, 5], [12.5, 2.5]]), z: [1.6, 5.4],
-    cabin: cw([[7, -4.4], [-7, -4.8], [-9.5, -3.8], [-9.5, 3.8], [-7, 4.8], [7, 4.4], [9, 3], [9, -3]]), cz: 9.4,
-    roof: null, wheels: [[7.2, -5.6], [7.2, 5.6], [-7.2, -5.6], [-7.2, 5.6]], wsz: [3.2, 1.6, 4.4], front: 12.5, rear: -12, lightY: [3.4, 5.4], glassRoof: true, lightbar: true
-  },
-  kart: {
-    body: cw([[9, -3], [7, -5], [-7.5, -5.2], [-8.5, -4], [-8.5, 4], [-7.5, 5.2], [7, 5], [9, 3]]), z: [1, 2.6],
-    cabin: null, roof: null, wheels: [[5.6, -6.2], [5.6, 6.2], [-6, -6.6], [-6, 6.6]], wsz: [2.4, 1.6, 3.6], front: 9, rear: -8.5, lightY: [1, 2],
-    kart: true, helmet: [-2, 8.6]
-  }
-};
-/** Zeichnet ein Auto. o: { x, y, a, z, gz, pitch, roll, color, shape, steer, damage, brake, alpha, ghost, num, lights } */
-function drawCar3D(ctx, o) {
-  const M = CAR3D[o.shape] || CAR3D.coupe;
-  const ca = Math.cos(o.a), sa = Math.sin(o.a), base = o.z || 0, gz = o.gz != null ? o.gz : base;
-  const pitch = o.pitch || 0, roll = o.roll || 0;
-  const col = o.ghost ? [190, 230, 255] : rgbOf(o.color);
-  const prevA = ctx.globalAlpha, prevZB = ZB;
-  ZB = 0;
-  ctx.globalAlpha = prevA * (o.alpha != null ? o.alpha : 1);
-  const WX = (lx, ly) => o.x + lx * ca - ly * sa, WY = (lx, ly) => o.y + lx * sa + ly * ca;
-  const Q = (lx, ly, lz) => P(WX(lx, ly), WY(lx, ly), base + lz + lx * pitch + ly * roll);
-  const visible = (ax, ay, bx, by) => { const ex = bx - ax, ey = by - ay, l = Math.hypot(ex, ey) || 1, nlx = ey / l, nly = -ex / l; return [nlx * sa + nly * ca, nlx * ca - nly * sa]; };
-  const prismL = (loc, z0, z1, top, side) => {
-    const n = loc.length, T = loc.map(([x, y]) => Q(x, y, z1)), B = loc.map(([x, y]) => Q(x, y, z0));
-    for (let i = 0; i < n; i++) {
-      const j = (i + 1) % n, [ny, nx] = visible(loc[i][0], loc[i][1], loc[j][0], loc[j][1]);
-      if (ny <= 0.03) continue;
-      fillPoly(ctx, [B[i], B[j], T[j], T[i]], typeof side === 'string' ? side : mul(side, 0.72 - 0.2 * nx));
-    }
-    if (top) fillPoly(ctx, T, top);
-    return T;
-  };
-  const quadTop = (x0, y0, x1, y1, z, st) => fillPoly(ctx, [Q(x0, y0, z), Q(x1, y0, z), Q(x1, y1, z), Q(x0, y1, z)], st);
-  // Schatten am Boden (wird kleiner und blasser, je höher das Auto fliegt)
-  if (!o.ghost) {
-    const hh = Math.max(0, base - gz), k = Math.max(0.25, 1 - hh / 70);
-    const sh = M.body.map(([lx, ly]) => P(WX(lx, ly) + 2.4 + hh * 0.55, WY(lx, ly) + 1.8 + hh * 0.38, gz));
-    ctx.globalAlpha = prevA * (o.alpha != null ? o.alpha : 1) * k;
-    fillPoly(ctx, sh, 'rgba(0,0,0,.34)');
-    ctx.globalAlpha = prevA * (o.alpha != null ? o.alpha : 1);
-  }
-  // Räder
-  const [wl, ww, wh] = M.wsz;
-  M.wheels.forEach(([wx, wy], i) => {
-    const st = i < 2 ? (o.steer || 0) * 0.45 : 0, c = Math.cos(st), s = Math.sin(st);
-    const loc = cw([[-wl, -ww], [wl, -ww], [wl, ww], [-wl, ww]].map(([x, y]) => [wx + x * c - y * s, wy + x * s + y * c]));
-    prismL(loc, 0, wh, '#2a2c31', [22, 23, 26]);
-    if (M.kart || o.shape === 'formula') fillPoly(ctx, [Q(wx - 0.8, wy - 0.4, wh), Q(wx + 0.8, wy - 0.4, wh), Q(wx + 0.8, wy + 0.4, wh), Q(wx - 0.8, wy + 0.4, wh)], '#9aa0aa');
-  });
-  const dmg = o.damage || 0;
-  const bodyTop = mul(col, 1 - dmg * 0.25);
-  if (M.kart) {
-    // Rahmen + Seitenkästen, Fahrer mit Helm
-    prismL(M.body, M.z[0], M.z[1], '#3a3d44', [40, 42, 48]);
-    prismL(cw([[3, -5.4], [-4, -5.4], [-4, -3.4], [3, -3.4]]), M.z[1], 4.4, bodyTop, col);
-    prismL(cw([[3, 3.4], [-4, 3.4], [-4, 5.4], [3, 5.4]]), M.z[1], 4.4, bodyTop, col);
-    prismL(cw([[9.5, -3.2], [7, -3.2], [7, 3.2], [9.5, 3.2]]), M.z[1], 4, bodyTop, col);
-    prismL(cw([[-1, -2.6], [-5.5, -2.6], [-5.5, 2.6], [-1, 2.6]]), M.z[1], 6.5, mul(col, 0.8), mul(col, 0.7));
-  } else {
-    prismL(M.body, M.z[0], M.z[1], bodyTop, col);
-    if (M.stripe) quadTop(M.rear + 1, -0.9, M.front - 2, 0.9, M.z[1], mul(col, 1.35));
-    if (o.shape === 'rally') { quadTop(M.rear + 1, -2.6, M.front - 1, -1.6, M.z[1], '#ffffff'); quadTop(M.rear + 1, 1.6, M.front - 1, 2.6, M.z[1], '#ffffff'); }
-  }
-  // Lichter
-  const ly = M.lightY;
-  if (!M.kart) {
-    const head = o.lights ? '#fffbe0' : '#fff4c2';
-    quadTop(M.front - 1.8, -ly[1], M.front - 0.4, -ly[0], M.z[1], head); quadTop(M.front - 1.8, ly[0], M.front - 0.4, ly[1], M.z[1], head);
-    const brakeCol = o.brake ? '#ff3030' : (o.lights ? '#c42020' : '#7a1515');
-    quadTop(M.rear + 0.3, -ly[1], M.rear + 1.6, -ly[0], M.z[1], brakeCol); quadTop(M.rear + 0.3, ly[0], M.rear + 1.6, ly[1], M.z[1], brakeCol);
-  }
-  if (o.brake && !o.ghost) {
-    const [X, Y] = Q(M.rear - 1, 0, M.z[1]);
-    const g = ctx.createRadialGradient(X, Y, 0, X, Y, 9); g.addColorStop(0, 'rgba(255,40,40,.45)'); g.addColorStop(1, 'rgba(255,40,40,0)');
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(X, Y, 9, 0, 7); ctx.fill();
-  }
-  // Kabine
-  if (M.cabin) {
-    const glass = o.ghost ? 'rgba(120,160,190,.9)' : '#24303f';
-    prismL(M.cabin, M.z[1], M.cz, M.roof ? null : glass, o.ghost ? [120, 160, 190] : [36, 48, 63]);
-    if (M.roof) fillPoly(ctx, M.roof.map(([x, y]) => Q(x, y, M.cz)), mul(col, 1.18));
-    else { const [X, Y] = Q(0.5, -1.2, M.cz); ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.beginPath(); ctx.ellipse(X, Y, 1.6, 0.9, o.a, 0, 7); ctx.fill(); }
-  }
-  if (M.scoop) prismL(cw([[1, -1.2], [-2.5, -1.2], [-2.5, 1.2], [1, 1.2]]), M.cz, M.cz + 1.4, '#22262c', [30, 32, 36]);
-  if (M.pods) for (const yy of [-2.2, 0, 2.2]) prismL(cw([[M.front - 2, yy - 0.8], [M.front - 3.4, yy - 0.8], [M.front - 3.4, yy + 0.8], [M.front - 2, yy + 0.8]]), M.z[1], M.z[1] + 1.4, '#fffbe0', [60, 60, 60]);
-  if (M.flaps) for (const yy of [-5.6, 5.6]) prismL(cw([[-9.6, yy - 0.9], [-10.2, yy - 0.9], [-10.2, yy + 0.9], [-9.6, yy + 0.9]]), 0.5, 4, '#15171b', [20, 22, 26]);
-  if (M.fwing) { prismL(cw([[15.6, -7.4], [13.6, -7.4], [13.6, 7.4], [15.6, 7.4]]), 0.8, 2, mul(col, 0.8), mul(col, 0.6)); }
-  if (M.rwing) {
-    for (const yy of [-3, 3]) prismL(cw([[-11.5, yy - 0.5], [-12.5, yy - 0.5], [-12.5, yy + 0.5], [-11.5, yy + 0.5]]), M.z[1], 8, null, [40, 40, 44]);
-    prismL(cw([[-10.6, -6.6], [-13.6, -6.6], [-13.6, 6.6], [-10.6, 6.6]]), 8, 9.6, mul(col, 0.75), mul(col, 0.55));
-  }
-  // Heckflügel (Blitz)
-  if (M.wing) {
-    for (const yy of [-4, 4]) prismL(cw([[-10.5, yy - 0.5], [-12, yy - 0.5], [-12, yy + 0.5], [-10.5, yy + 0.5]]), M.z[1], 8, null, [40, 40, 44]);
-    prismL(cw([[-10.4, -6.8], [-13.6, -6.8], [-13.6, 6.8], [-10.4, 6.8]]), 8, 9.2, mul(col, 0.7), mul(col, 0.5));
-  }
-  // Fahrerhelm (Formel, Kart)
-  if (M.helmet) {
-    const [hx, hz] = M.helmet, [X, Y] = Q(hx, 0, hz), r = 2.3 * projS(o.y);
-    const g = ctx.createRadialGradient(X - r * 0.4, Y - r * 0.5, 0, X, Y, r);
-    g.addColorStop(0, '#ffffff'); g.addColorStop(0.35, o.ghost ? '#bfe8ff' : o.color); g.addColorStop(1, mul(col, 0.5));
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(X, Y, r, 0, 7); ctx.fill();
-    const [VX, VY] = Q(hx + 1.6, 0, hz); ctx.fillStyle = '#1a1f28'; ctx.beginPath(); ctx.ellipse(VX, VY, 1.1 * projS(o.y), 0.9 * projS(o.y), o.a, 0, 7); ctx.fill();
-  }
-  // Überrollkäfig
-  if (M.cage) {
-    ctx.strokeStyle = '#2b2e35'; ctx.lineWidth = 1.2;
-    const cps = [[3, -3.4], [-5, -3.4], [-5, 3.4], [3, 3.4]];
-    const top = cps.map(([x, y]) => Q(x, y, 12)), bot = cps.map(([x, y]) => Q(x, y, M.z[1]));
-    ctx.beginPath();
-    for (let i = 0; i < 4; i++) { ctx.moveTo(bot[i][0], bot[i][1]); ctx.lineTo(top[i][0], top[i][1]); }
-    ctx.moveTo(top[0][0], top[0][1]); for (let i = 1; i <= 4; i++) ctx.lineTo(top[i % 4][0], top[i % 4][1]);
-    ctx.stroke();
-  }
-  // Pickup: Ladefläche, Bügel
-  if (M.bed) {
-    fillPoly(ctx, [Q(-3.4, -5.4, M.z[1] - 0.1), Q(-10.8, -5.4, M.z[1] - 0.1), Q(-10.8, 5.4, M.z[1] - 0.1), Q(-3.4, 5.4, M.z[1] - 0.1)], mul(col, 0.45));
-    if (M.bars) prismL(cw([[-3.2, -5.6], [-4.2, -5.6], [-4.2, 5.6], [-3.2, 5.6]]), M.z[1], M.cz - 1, '#2a2d33', [36, 38, 44]);
-  }
-  // Truck: Kofferaufbau
-  if (M.cargo) {
-    const box = cw([[5, -7.2], [-15.2, -7.2], [-15.2, 7.2], [5, 7.2]]);
-    prismL(box, M.z[1], 17, o.ghost ? null : '#e8e9ec', o.ghost ? [150, 190, 220] : [200, 202, 208]);
-    if (!o.ghost) quadTop(-13.5, -5.8, 3.5, -4.4, 17.01, mul(col, 1.1)), quadTop(-13.5, 4.4, 3.5, 5.8, 17.01, mul(col, 1.1));
-  }
-  // Muscle-Car: Doppelstreifen + Lufthutze
-  if (M.twin) { quadTop(M.rear + 1, -2.2, M.front - 1, -1.0, M.z[1] + 0.01, '#f2f2f2'); quadTop(M.rear + 1, 1.0, M.front - 1, 2.2, M.z[1] + 0.01, '#f2f2f2'); }
-  if (M.hoodScoop) prismL(cw([[9, -1.6], [5, -1.6], [5, 1.6], [9, 1.6]]), M.z[1], M.z[1] + 1.6, '#1d2026', [28, 30, 34]);
-  // Elektro: Glasdach, Lichtband
-  if (M.glassRoof) fillPoly(ctx, M.cabin.map(([x, y]) => Q(x * 0.85, y * 0.85, M.cz + 0.01)), o.ghost ? 'rgba(160,200,230,.8)' : 'rgba(120,190,235,.85)');
-  if (M.lightbar) quadTop(M.front - 1.4, -4.2, M.front - 0.6, 4.2, M.z[1] + 0.01, o.lights ? '#e8fbff' : '#bfefff');
-  // Startnummer
-  if (o.num != null && !o.ghost && !M.kart) {
-    const nz = M.cargo ? 17 : M.roof ? M.cz : M.glassRoof ? M.z[1] : M.z[1], [X, Y] = Q(M.cargo ? -5 : M.roof ? (M.bed ? 1 : -1.5) : (o.shape === 'formula' ? -6 : M.front - 6), 0, nz + 0.02), sc = projS(o.y);
-    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(X, Y, 2.9 * sc, 2.5 * sc, 0, 0, 7); ctx.fill();
-    ctx.fillStyle = '#111'; ctx.font = '700 ' + (4.4 * sc).toFixed(1) + 'px "Chakra Petch",sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(String(o.num), X, Y + 0.3);
-  }
-  // Schaden: Kratzer
-  if (dmg > 0.4 && !o.ghost && !M.kart) {
-    ctx.strokeStyle = 'rgba(20,20,20,.55)'; ctx.lineWidth = 0.8;
-    const a = Q(-5, -3, M.z[1]), b = Q(-1, -1, M.z[1]), c = Q(-3, 2, M.z[1]);
-    ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.lineTo(c[0], c[1]); ctx.stroke();
-    if (dmg > 0.7) { const d = Q(6, 2, M.z[1]), e = Q(9, -1, M.z[1]); ctx.beginPath(); ctx.moveTo(d[0], d[1]); ctx.lineTo(e[0], e[1]); ctx.stroke(); }
-  }
-  ctx.globalAlpha = prevA; ZB = prevZB;
-}
-/** Vorderkante eines Autos (für Scheinwerferkegel). */
-const carFront = shape => (CAR3D[shape] || CAR3D.coupe).front;
-
 /* ---------- Szene: Hintergrund, gekippter Boden, Lichtstimmung ---------- */
 const THEME_SKY = {
   meadow: ['#7fb6e6', '#cfe6f2', [96, 142, 88], [70, 118, 70]],
@@ -729,17 +542,88 @@ function splatTerrain(c, t, F, rs = 1) {
   }
   c.putImageData(img, 0, 0);
 }
+/** Kachel mit feinem Korn (mittleres Grau ± Rauschen) – bringt Schärfe in den hochgerechneten Boden. */
+let grainC = null;
+function grainTile() {
+  if (grainC) return grainC;
+  grainC = document.createElement('canvas'); grainC.width = grainC.height = 192;
+  const g = grainC.getContext('2d'), im = g.createImageData(192, 192), r = mulberry32(77);
+  for (let i = 0; i < 192 * 192; i++) { const v = 128 + (r() - 0.5) * 78 + (r() > 0.97 ? 34 : 0); im.data[i * 4] = im.data[i * 4 + 1] = im.data[i * 4 + 2] = v; im.data[i * 4 + 3] = 255; }
+  g.putImageData(im, 0, 0);
+  return grainC;
+}
+/** Kleinteile abseits der Fahrbahn: Grasbüschel, Blumen, Steine, Schneewehen (als Vektoren → auch im Zoom scharf). */
+function groundDetails(g, t, out) {
+  const rng = mulberry32(t.name.length * 53 + 11), flowers = t.theme !== 'city' && t.theme !== 'snow' && t.theme !== 'volcano';
+  g.save(); g.lineCap = 'round';
+  for (let i = 0; i < 2600; i++) {
+    const x = 6 + rng() * (W - 12), y = 6 + rng() * (H - 12), ci = clamp(Math.floor(y / CELL), 0, GH - 1) * GW + clamp(Math.floor(x / CELL), 0, GW - 1);
+    const s = t.grid[ci], q = rng(), far = out ? out[ci] : 99;
+    if (far < 7) continue;
+    if (s === S.GRASS) {
+      if (q < 0.74) {
+        // Grasbüschel: ein paar Halme, heller oder dunkler als der Rasen
+        const lit = rng() > 0.45, n = 3 + (rng() * 3 | 0), len = 1.8 + rng() * 2.4;
+        g.strokeStyle = lit ? 'rgba(150,200,96,0.55)' : 'rgba(28,74,30,0.5)'; g.lineWidth = 0.55; g.beginPath();
+        for (let k = 0; k < n; k++) { const a = -1.57 + (k - (n - 1) / 2) * 0.42 + (rng() - 0.5) * 0.3; g.moveTo(x + (k - n / 2) * 0.5, y); g.lineTo(x + (k - n / 2) * 0.5 + Math.cos(a) * len, y + Math.sin(a) * len); }
+        g.stroke();
+      } else if (q < 0.9 && flowers && far > 14) {
+        const col = ['#fff8d8', '#ffd84a', '#ff8fc0', '#ffffff', '#c9a0ff'][rng() * 5 | 0], n = 3 + (rng() * 5 | 0);
+        for (let k = 0; k < n; k++) { const fx = x + (rng() - 0.5) * 9, fy = y + (rng() - 0.5) * 6; g.fillStyle = 'rgba(20,60,24,.35)'; g.beginPath(); g.arc(fx + 0.3, fy + 0.4, 0.75, 0, 7); g.fill(); g.fillStyle = col; g.beginPath(); g.arc(fx, fy, 0.7, 0, 7); g.fill(); g.fillStyle = 'rgba(255,200,40,.9)'; g.beginPath(); g.arc(fx, fy, 0.25, 0, 7); g.fill(); }
+      } else if (q > 0.97) { g.fillStyle = 'rgba(64,50,36,.35)'; g.beginPath(); g.ellipse(x, y, 2 + rng() * 3, 1.2 + rng() * 1.6, rng() * 3, 0, 7); g.fill(); }   // kahle Stelle
+    } else if (s === S.SAND || s === S.GRAVEL || s === S.ASH) {
+      if (q < 0.5) {
+        const rr = 0.7 + rng() * 1.5, dk = s === S.ASH;
+        g.fillStyle = 'rgba(0,0,0,.22)'; g.beginPath(); g.ellipse(x + 0.6, y + 0.6, rr * 1.15, rr * 0.8, 0.4, 0, 7); g.fill();
+        g.fillStyle = dk ? '#4c4444' : s === S.SAND ? '#b9a07a' : '#8f8a82'; g.beginPath(); g.ellipse(x, y, rr * 1.1, rr * 0.8, rng() * 3, 0, 7); g.fill();
+        g.fillStyle = 'rgba(255,255,255,.3)'; g.beginPath(); g.ellipse(x - rr * 0.3, y - rr * 0.25, rr * 0.45, rr * 0.3, 0, 0, 7); g.fill();
+      } else if (s === S.SAND && q < 0.62 && t.theme === 'desert') {
+        g.strokeStyle = 'rgba(150,128,70,.6)'; g.lineWidth = 0.5; g.beginPath(); for (let k = 0; k < 5; k++) { const a = -1.57 + (k - 2) * 0.5; g.moveTo(x, y); g.lineTo(x + Math.cos(a) * 3.2, y + Math.sin(a) * 3.2); } g.stroke();   // dürres Büschel
+      }
+    } else if (s === S.SNOW && q < 0.2) {
+      const rw = 3 + rng() * 6;
+      g.fillStyle = 'rgba(150,176,214,.22)'; g.beginPath(); g.ellipse(x + 0.8, y + 0.9, rw, rw * 0.36, 0.2, 0, 7); g.fill();
+      g.fillStyle = 'rgba(255,255,255,.6)'; g.beginPath(); g.ellipse(x, y, rw, rw * 0.34, 0.2, 0, 7); g.fill();
+    }
+  }
+  g.restore();
+}
+/** Himmel: Sonne mit Schein und Wolken (je nach Wetter und Tageszeit). */
+function drawSky(c, hz, wx, SC, rng) {
+  if (wx.time === 'night') return;
+  if (wx.time === 'day' && wx.sky === 'clear') {
+    const sx = W * 0.17, sy = hz * 0.36;
+    const gl = c.createRadialGradient(sx, sy, 0, sx, sy, 150); gl.addColorStop(0, 'rgba(255,250,224,0.85)'); gl.addColorStop(0.07, 'rgba(255,246,206,0.55)'); gl.addColorStop(0.3, 'rgba(255,240,200,0.14)'); gl.addColorStop(1, 'rgba(255,240,200,0)');
+    c.fillStyle = gl; c.fillRect(sx - 150, 0, 300, hz + 6);
+    c.fillStyle = '#fffdf0'; c.beginPath(); c.arc(sx, sy, 8.5, 0, 7); c.fill();
+  }
+  const n = wx.sky === 'clear' ? 5 : 13, dusk = wx.time === 'dusk';
+  const lit = dusk ? [255, 196, 160] : wx.sky === 'rain' ? [176, 182, 192] : wx.sky === 'cloudy' ? [226, 230, 236] : [255, 255, 255];
+  const dark = dusk ? [150, 96, 128] : wx.sky === 'rain' ? [112, 118, 130] : wx.sky === 'cloudy' ? [164, 172, 184] : [206, 220, 236];
+  for (let i = 0; i < n; i++) {
+    const cx = (i + rng()) / n * W, cy = 12 + rng() * (hz - 52), w = 34 + rng() * (wx.sky === 'clear' ? 46 : 90), h = w * (0.2 + rng() * 0.1);
+    const puffs = []; for (let k = 0; k < 7; k++) { const u = k / 6; puffs.push([cx + (u - 0.5) * w * 1.6, cy - Math.sin(u * Math.PI) * h * (0.6 + rng() * 0.6), h * (0.55 + Math.sin(u * Math.PI) * 0.6 + rng() * 0.2)]); }
+    c.save(); c.globalAlpha = wx.sky === 'clear' ? 0.9 : 0.95;
+    c.beginPath(); c.rect(cx - w * 1.4, 0, w * 2.8, cy + h * 0.55); c.clip();       // flache Unterseite
+    c.fillStyle = css(dark); for (const [x, y, r] of puffs) { c.beginPath(); c.arc(x + 1, y + 2.5, r, 0, 7); c.fill(); }
+    c.fillStyle = css(lit); for (const [x, y, r] of puffs) { c.beginPath(); c.arc(x - 0.5, y - 1, r * 0.92, 0, 7); c.fill(); }
+    c.restore();
+  }
+}
 /** Baut alle statischen Ebenen eines Rennens in der schrägen Ansicht. wx = { sky, time, snow } */
 function buildScene(t, rt, opt = {}, wx = { sky: 'clear', time: 'day' }) {
   const theme = THEME_SKY[t.theme] ? t.theme : 'meadow', look = t.look && THEME_SKY[t.look] ? t.look : theme, SC = skyColors(look, wx);
   const RS = opt.rs || 1;          // Auflösung der Bodenebene und Szene (2 für die Zoom-Kamera)
   // 1) Flache Welt: Boden mit Schmutzrändern, Gummispur, Markierungen, Schatten
-  const gr = cachedGround(t);
+  const gr = cachedGround(t, rt);
   let F = gr.canvas, g = gr.ctx;
   if (RS > 1) {
     // Boden pixelgenau hochrechnen (keine Unschärfe), Linien/Markierungen danach in voller Auflösung
     const F2 = document.createElement('canvas'); F2.width = W * RS; F2.height = H * RS;
-    const g2 = F2.getContext('2d'); g2.imageSmoothingEnabled = false; g2.drawImage(F, 0, 0, W * RS, H * RS); g2.imageSmoothingEnabled = true;
+    // weich hochrechnen (runde Kanten statt Klötzchen) und feines Korn in voller Auflösung darüberlegen
+    const g2 = F2.getContext('2d'); g2.imageSmoothingEnabled = true; g2.imageSmoothingQuality = 'high'; g2.drawImage(F, 0, 0, W * RS, H * RS);
+    g2.globalCompositeOperation = 'overlay'; g2.globalAlpha = 0.55; g2.fillStyle = g2.createPattern(grainTile(), 'repeat'); g2.fillRect(0, 0, W * RS, H * RS);
+    g2.globalCompositeOperation = 'source-over'; g2.globalAlpha = 1;
     g2.setTransform(RS, 0, 0, RS, 0, 0); F = F2; g = g2;
   }
   if (rt) {
@@ -747,13 +631,27 @@ function buildScene(t, rt, opt = {}, wx = { sky: 'clear', time: 'day' }) {
     g.beginPath(); for (let i = 0; i <= rt.n; i++) { const k = i % rt.n; i ? g.lineTo(rt.lx[k], rt.ly[k]) : g.moveTo(rt.lx[k], rt.ly[k]); }
     g.strokeStyle = 'rgba(25,25,28,0.10)'; g.lineWidth = 16; g.stroke();
     g.strokeStyle = 'rgba(25,25,28,0.08)'; g.lineWidth = 7; g.stroke();
+    // Fahrspuren auf losem Untergrund: zwei eingefahrene Rillen mit hellem Mittelsteg
+    const rut = (off, style, lw) => {
+      g.beginPath(); let pen = false;
+      for (let i = 0; i <= rt.n; i++) {
+        const k = i % rt.n, x = rt.lx[k] - rt.ty[k] * off, y = rt.ly[k] + rt.tx[k] * off;
+        if (cellAt(t, x, y) !== S.DIRT) { pen = false; continue; }
+        pen ? g.lineTo(x, y) : g.moveTo(x, y); pen = true;
+      }
+      g.strokeStyle = style; g.lineWidth = lw; g.stroke();
+    };
+    rut(-4.6, 'rgba(58,40,26,0.20)', 3.4); rut(4.6, 'rgba(58,40,26,0.20)', 3.4);
+    rut(-4.6, 'rgba(40,28,20,0.16)', 1.3); rut(4.6, 'rgba(40,28,20,0.16)', 1.3);
+    rut(0, 'rgba(214,190,150,0.10)', 3);
     g.restore();
   }
+  groundDetails(g, t, gr.out);
   drawMarkings(g, t, opt);
   const shc = document.createElement('canvas'); shc.width = W; shc.height = H;
   const sg = shc.getContext('2d');
   if (wx.time !== 'night') for (const o of t.objects) drawShadowFlat(sg, o);
-  g.globalAlpha = wx.sky === 'clear' ? 0.3 : 0.16; g.drawImage(shc, 0, 0); g.globalAlpha = 1;
+  g.globalAlpha = wx.sky === 'clear' ? 0.34 : 0.17; g.filter = 'blur(' + (wx.sky === 'clear' ? 1.3 : 3) * RS + 'px)'; g.drawImage(shc, 0, 0); g.filter = 'none'; g.globalAlpha = 1;
   // Nässe, Pfützen, Neuschnee
   if (wx.sky === 'rain' && !wx.snow) {
     g.globalCompositeOperation = 'multiply'; g.fillStyle = 'rgb(196,202,212)'; g.fillRect(0, 0, W, H); g.globalCompositeOperation = 'source-over';
@@ -773,6 +671,7 @@ function buildScene(t, rt, opt = {}, wx = { sky: 'clear', time: 'day' }) {
   const skyG = c.createLinearGradient(0, 0, 0, hz + 10); skyG.addColorStop(0, css(SC.top)); skyG.addColorStop(1, css(SC.bot));
   c.fillStyle = skyG; c.fillRect(0, 0, W, hz + 12);
   const rng = mulberry32(t.name.length * 31 + 7);
+  drawSky(c, hz, wx, SC, mulberry32(t.name.length * 17 + 3));
   if (wx.time === 'night') for (let i = 0; i < 90; i++) { c.fillStyle = 'rgba(255,255,255,' + (0.3 + rng() * 0.6) + ')'; c.fillRect(rng() * W, rng() * (hz - 10), 1.2, 1.2); }
   if (wx.time === 'dusk') { const sx = W * 0.78, sy = hz - 18, sg2 = c.createRadialGradient(sx, sy, 0, sx, sy, 60); sg2.addColorStop(0, 'rgba(255,230,170,1)'); sg2.addColorStop(0.25, 'rgba(255,190,110,.8)'); sg2.addColorStop(1, 'rgba(255,150,90,0)'); c.fillStyle = sg2; c.fillRect(sx - 60, sy - 60, 120, 120); }
   if (wx.time === 'night') { c.fillStyle = 'rgba(240,240,220,.9)'; c.beginPath(); c.arc(W * 0.18, hz * 0.35, 9, 0, 7); c.fill(); c.fillStyle = css(SC.top); c.beginPath(); c.arc(W * 0.18 + 4, hz * 0.35 - 2, 8, 0, 7); c.fill(); }
@@ -792,9 +691,10 @@ function buildScene(t, rt, opt = {}, wx = { sky: 'clear', time: 'day' }) {
   const baseType = cnt.indexOf(Math.max(...cnt));
   const tile = document.createElement('canvas'); tile.width = tile.height = 96;
   const tg = tile.getContext('2d'), ti = tg.createImageData(96, 96), col = [0, 0, 0];
+  SURF_TILE = true;
   const dk = wx.sky === 'rain' ? 0.78 : 0.92;
   for (let y = 0; y < 96; y++) for (let x = 0; x < 96; x++) { surfColor(baseType, x + 4000, y + 4000, t.theme, col); const i = (y * 96 + x) * 4; ti.data[i] = col[0] * dk; ti.data[i + 1] = col[1] * dk; ti.data[i + 2] = col[2] * dk; ti.data[i + 3] = 255; }
-  tg.putImageData(ti, 0, 0);
+  tg.putImageData(ti, 0, 0); SURF_TILE = false;
   c.save(); c.beginPath(); c.rect(0, hz, W, H - hz); c.clip();
   c.fillStyle = c.createPattern(tile, 'repeat'); c.fillRect(0, hz, W, H - hz);
   c.restore();
@@ -820,6 +720,12 @@ function buildScene(t, rt, opt = {}, wx = { sky: 'clear', time: 'day' }) {
   if (wx.sky === 'rain') tint = 'rgba(50,60,80,0.14)'; else if (wx.sky === 'cloudy') tint = 'rgba(70,80,96,0.08)';
   if (wx.time === 'dusk') tint = 'rgba(255,120,60,0.10)';
   o2.fillStyle = tint; o2.fillRect(0, 0, W, H);
+  if (wx.time === 'day' && wx.sky === 'clear') {
+    // Sonnenlicht von links hinten: warm im Licht, kühl im Vordergrund rechts
+    const sun = o2.createLinearGradient(0, hz, W, H);
+    sun.addColorStop(0, 'rgba(255,232,170,0.11)'); sun.addColorStop(0.5, 'rgba(255,232,170,0)'); sun.addColorStop(1, 'rgba(24,40,90,0.09)');
+    o2.fillStyle = sun; o2.fillRect(0, hz - 10, W, H);
+  }
   const vg = o2.createRadialGradient(W / 2, H * 0.55, H * 0.35, W / 2, H * 0.55, H * 0.95);
   vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.30)');
   o2.fillStyle = vg; o2.fillRect(0, 0, W, H);
