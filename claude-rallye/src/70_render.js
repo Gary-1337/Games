@@ -280,7 +280,8 @@ function drawPitMenu(ctx, c, race, sx, y) {
     ctx.fillStyle = '#8a97ad'; ctx.font = '500 10px "Chakra Petch",sans-serif';
     ctx.fillText(active ? 'läuft …' : queued ? 'wartet' : it[4], x + 4, yy + 24);
   });
-  if (!sv.cur && !sv.q.length && Math.abs(fwdSpeed(c)) >= 12) { label(ctx, sx, yy + 44, 'Anhalten für Boxenstopp', 'rgba(0,0,0,.7)', '#ffcd32', 10); }
+  if (c.pitLock) label(ctx, sx, yy + 44, 'Fertig – Gas geben!', 'rgba(0,0,0,.7)', '#46d68a', 10);
+  else if (!sv.cur && !sv.q.length && Math.abs(fwdSpeed(c)) >= 5) { label(ctx, sx, yy + 44, 'Anhalten für Boxenstopp', 'rgba(0,0,0,.7)', '#ffcd32', 10); }
 }
 function drawCountdown(ctx, race) {
   const cx = W / 2, cy = 120;

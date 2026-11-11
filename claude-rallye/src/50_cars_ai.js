@@ -205,7 +205,7 @@ function stepCarPhysics(car, inp, dt, race) {
   updateTilt(car, rt, dt);
 
   // --- Verbrauch ---
-  if (race.state === 'running' && !car.finished) {
+  if (race.state === 'running' && !car.finished && !onPit) {
     const thrNow = car.air ? 0 : thr;
     if (rules.fuelOn && !race.fuelPlan) car.fuel = Math.max(0, car.fuel - Math.abs(vF) * dt * 0.0042 * (0.3 + 0.7 * thrNow) * rules.fuelPct / 100);
     if (rules.tireOn && !car.air) {

@@ -247,7 +247,7 @@ kbd{background:#0f141d;border:1px solid var(--line);border-bottom-width:2px;bord
 /* =====================================================================
    1  GRUNDLAGEN
    ===================================================================== */
-const VERSION = '1.10.0';
+const VERSION = '1.10.1';
 const W = 1280, H = 800;              // Weltgröße in Pixeln (eine Strecke = ein Bildschirm)
 const PANEL = 260;                    // Breite der Seitenleiste
 const CW = W + PANEL;                 // Canvas-Gesamtbreite
@@ -4311,7 +4311,7 @@ function stepCarPhysics(car, inp, dt, race) {
   updateTilt(car, rt, dt);
 
   // --- Verbrauch ---
-  if (race.state === 'running' && !car.finished) {
+  if (race.state === 'running' && !car.finished && !onPit) {
     const thrNow = car.air ? 0 : thr;
     if (rules.fuelOn && !race.fuelPlan) car.fuel = Math.max(0, car.fuel - Math.abs(vF) * dt * 0.0042 * (0.3 + 0.7 * thrNow) * rules.fuelPct / 100);
     if (rules.tireOn && !car.air) {
@@ -5554,11 +5554,17 @@ function updateRace(race, dt) {
 
     // Boxendienst
     car.inBox = !!(race.rules.pits && rt.pit && inBoxRect(rt.pit.box, car.x, car.y));
-    if (car.inBox && running && car.human >= 0 && !car.finished && Math.abs(fwdSpeed(car)) < 12) {
+    if (!car.inBox) car.pitLock = false;
+    // Menschen: nur bestellen, solange das Auto wirklich steht und kein Gas gegeben wird.
+    // Nach dem Stopp ist die Box gesperrt, bis man sie verlassen hat – sonst lösen Lenken (◀ ▶) und Bremsen (▼) beim Losfahren neue Dienste aus.
+    if (car.inBox && running && car.human >= 0 && !car.finished && !car.pitLock && Math.abs(fwdSpeed(car)) < 5 && inp.thr < 0.1) {
       if (inp.edge.left) queueService(car, 'repair', race);
       if (inp.edge.down) queueService(car, 'fuel', race);
       if (inp.edge.right) queueService(car, 'tires', race);
+      if (race.fuelPlan && !car.refueled) queueService(car, 'fuel', race);      // Pflichtstopp: Tanken startet beim Anhalten von selbst
     }
+    if (car.service.cur || car.service.q.length) car.pitServed = true;
+    else if (car.pitServed) { car.pitServed = false; if (car.inBox) car.pitLock = true; }
     if (updateService(car, dt, race)) { car.prevX = car.x; car.prevY = car.y; car.thr = 0; continue; }
     stepCarPhysics(car, inp, dt, race);
   }
@@ -5581,6 +5587,7 @@ function updateRace(race, dt) {
       // nur neu gewonnene Strecke zählt (Höchststand), damit Hin-und-her-Rutschen keinen Sprit kostet; Sprünge (Reset) zählen nicht
       if (Math.abs(ds) >= 40) car.progMax = (car.progMax || 0) + ds;
       car.prog = (car.prog || 0) + ds;
+      if (car.surf === S.PIT) car.progMax = Math.max(car.progMax || 0, car.prog);      // Boxengasse: kein Verbrauch
       if (car.prog > (car.progMax || 0)) {
         // nie mehr als den tatsächlich gefahrenen Weg berechnen (ein stehendes Auto verbraucht nichts)
         const mv = Math.hypot(car.x - car.prevX, car.y - car.prevY);
@@ -6108,7 +6115,8 @@ function drawPitMenu(ctx, c, race, sx, y) {
     ctx.fillStyle = '#8a97ad'; ctx.font = '500 10px "Chakra Petch",sans-serif';
     ctx.fillText(active ? 'läuft …' : queued ? 'wartet' : it[4], x + 4, yy + 24);
   });
-  if (!sv.cur && !sv.q.length && Math.abs(fwdSpeed(c)) >= 12) { label(ctx, sx, yy + 44, 'Anhalten für Boxenstopp', 'rgba(0,0,0,.7)', '#ffcd32', 10); }
+  if (c.pitLock) label(ctx, sx, yy + 44, 'Fertig – Gas geben!', 'rgba(0,0,0,.7)', '#46d68a', 10);
+  else if (!sv.cur && !sv.q.length && Math.abs(fwdSpeed(c)) >= 5) { label(ctx, sx, yy + 44, 'Anhalten für Boxenstopp', 'rgba(0,0,0,.7)', '#ffcd32', 10); }
 }
 function drawCountdown(ctx, race) {
   const cx = W / 2, cy = 120;

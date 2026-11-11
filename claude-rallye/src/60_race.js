@@ -376,11 +376,17 @@ function updateRace(race, dt) {
 
     // Boxendienst
     car.inBox = !!(race.rules.pits && rt.pit && inBoxRect(rt.pit.box, car.x, car.y));
-    if (car.inBox && running && car.human >= 0 && !car.finished && Math.abs(fwdSpeed(car)) < 12) {
+    if (!car.inBox) car.pitLock = false;
+    // Menschen: nur bestellen, solange das Auto wirklich steht und kein Gas gegeben wird.
+    // Nach dem Stopp ist die Box gesperrt, bis man sie verlassen hat – sonst lösen Lenken (◀ ▶) und Bremsen (▼) beim Losfahren neue Dienste aus.
+    if (car.inBox && running && car.human >= 0 && !car.finished && !car.pitLock && Math.abs(fwdSpeed(car)) < 5 && inp.thr < 0.1) {
       if (inp.edge.left) queueService(car, 'repair', race);
       if (inp.edge.down) queueService(car, 'fuel', race);
       if (inp.edge.right) queueService(car, 'tires', race);
+      if (race.fuelPlan && !car.refueled) queueService(car, 'fuel', race);      // Pflichtstopp: Tanken startet beim Anhalten von selbst
     }
+    if (car.service.cur || car.service.q.length) car.pitServed = true;
+    else if (car.pitServed) { car.pitServed = false; if (car.inBox) car.pitLock = true; }
     if (updateService(car, dt, race)) { car.prevX = car.x; car.prevY = car.y; car.thr = 0; continue; }
     stepCarPhysics(car, inp, dt, race);
   }
@@ -403,6 +409,7 @@ function updateRace(race, dt) {
       // nur neu gewonnene Strecke zählt (Höchststand), damit Hin-und-her-Rutschen keinen Sprit kostet; Sprünge (Reset) zählen nicht
       if (Math.abs(ds) >= 40) car.progMax = (car.progMax || 0) + ds;
       car.prog = (car.prog || 0) + ds;
+      if (car.surf === S.PIT) car.progMax = Math.max(car.progMax || 0, car.prog);      // Boxengasse: kein Verbrauch
       if (car.prog > (car.progMax || 0)) {
         // nie mehr als den tatsächlich gefahrenen Weg berechnen (ein stehendes Auto verbraucht nichts)
         const mv = Math.hypot(car.x - car.prevX, car.y - car.prevY);

@@ -4,6 +4,13 @@ Top-Down-Arcade-Rennspiel in einer einzigen Datei (HTML5 + Canvas + JavaScript).
 Die aktuelle Version liegt immer in `index.html`. Die Versionsnummer steht unten rechts im Hauptmenü.
 Unter `versions/` liegen höchstens 3 Versionsstände, ältere werden gelöscht (sie bleiben in der Git-Historie abrufbar). **Rollback:** gewünschte Datei aus `versions/` als `index.html` verwenden. Alle Änderungen sind hier dokumentiert.
 
+## 1.10.1 (11.11.2026)
+Boxenstopp repariert.
+- **Behoben:** Nach einem Stopp kam man kaum aus der Box, weil Lenken (◀ ▶) und Bremsen (▼) beim Losfahren sofort wieder Reparatur, Reifen oder Tanken bestellt haben. Jetzt nimmt die Box nur Bestellungen an, solange das Auto steht und kein Gas gegeben wird, und nach dem Stopp ist sie gesperrt, bis man sie verlassen hat („Fertig – Gas geben!“).
+- **Behoben:** In der Boxengasse gehen Sprit und Reifen nicht mehr zurück.
+- **Tankpflicht:** Beim Anhalten in der Box startet das Pflicht-Tanken von selbst. Reparatur und Reifen bestellt man wie bisher mit ◀ und ▶, auch während getankt wird.
+- Neuer Test `tests/pitstop.py`.
+
 ## 1.10.0 (11.11.2026)
 Tankpflicht: Jeder muss mindestens einmal pro Rennen nachtanken.
 - **Regel:** Gilt in allen Rundenrennen ab 2 Runden auf Strecken mit Box, wenn „Tankpflicht“ und „Boxenstopps“ eingeschaltet sind (Standard). Nicht im Zeitfahren, Derby und in Rallye-Etappen.
