@@ -152,7 +152,7 @@ const UI = {
     raceCol += '<h3 style="margin-top:22px">Regeln</h3>';
     const ruleRow = (label, on, pctKey, onKey) => `<div class="row"><label class="l">${label}</label>${tog('rule', on).replace('data-act="rule"', `data-act="rule" data-v="${onKey}"`)}
       <input type="range" min="25" max="300" step="25" value="${rules[pctKey]}" data-act="pct" data-v="${pctKey}" ${on ? '' : 'disabled'}><span class="pct">${rules[pctKey]}%</span></div>`;
-    raceCol += ruleRow('Spritverbrauch', rules.fuelOn, 'fuelPct', 'fuelOn');
+    raceCol += `<div class="row"><label class="l">Tankpflicht</label>${tog('rule', rules.fuelOn).replace('data-act="rule"', 'data-act="rule" data-v="fuelOn"')}<span class="note">mind. 1 Tankstopp je Rennen – schnelle Autos früh, langsame spät</span></div>`;
     raceCol += ruleRow('Reifenverschleiß', rules.tireOn, 'tirePct', 'tireOn');
     raceCol += ruleRow('Schadensmodell', rules.dmgOn, 'dmgPct', 'dmgOn');
     raceCol += `<div class="row"><label class="l">Boxenstopps</label>${tog('rule', rules.pits).replace('data-act="rule"', 'data-act="rule" data-v="pits"')}</div>`;

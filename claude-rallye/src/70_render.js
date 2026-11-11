@@ -450,6 +450,13 @@ function drawPlayerCard(ctx, c, race, x, y, w, h) {
   if (!bars.length) { ctx.fillStyle = '#6f7d94'; ctx.font = '500 10px "Chakra Petch",sans-serif'; ctx.fillText('Sprit, Reifen und Schaden aus', x + 12, by + 8); }
   if (c.wrong && !c.finished) { ctx.fillStyle = '#ff4d5e'; ctx.font = '700 10px "Chakra Petch",sans-serif'; ctx.fillText('FALSCHE RICHTUNG', x + 12, y + h - 4); }
   else if (c.service.cur) { ctx.fillStyle = '#ffcd32'; ctx.font = '700 10px "Chakra Petch",sans-serif'; ctx.fillText('BOX: ' + SERVICE_NAME[c.service.cur] + ' …', x + 12, y + h - 4); }
+  else if (race.fuelPlan && !c.finished && c.fuelDue) {
+    // Tankpflicht: Frist anzeigen, in der fälligen Runde blinkend
+    const due = c.lap >= c.fuelDue, blink = Math.sin(race.time * 9) > 0;
+    ctx.font = '700 10px "Chakra Petch",sans-serif';
+    if (c.refueled) { ctx.fillStyle = '#46d68a'; ctx.fillText('Tankstopp erledigt', x + 12, y + h - 4); }
+    else { ctx.fillStyle = due ? (blink ? '#ff4d5e' : '#ffc83d') : '#ffc83d'; ctx.fillText(due ? 'JETZT TANKEN (Box, ▼)' : 'Tanken bis Runde ' + c.fuelDue, x + 12, y + h - 4); }
+  }
 }
 
 /** Abstand zum Vorder- und Hintermann (Sekunden, geschätzt aus Streckenabstand und Tempo). */

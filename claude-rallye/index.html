@@ -247,7 +247,7 @@ kbd{background:#0f141d;border:1px solid var(--line);border-bottom-width:2px;bord
 /* =====================================================================
    1  GRUNDLAGEN
    ===================================================================== */
-const VERSION = '1.9.0';
+const VERSION = '1.10.0';
 const W = 1280, H = 800;              // Weltgröße in Pixeln (eine Strecke = ein Bildschirm)
 const PANEL = 260;                    // Breite der Seitenleiste
 const CW = W + PANEL;                 // Canvas-Gesamtbreite
@@ -4313,7 +4313,7 @@ function stepCarPhysics(car, inp, dt, race) {
   // --- Verbrauch ---
   if (race.state === 'running' && !car.finished) {
     const thrNow = car.air ? 0 : thr;
-    if (rules.fuelOn) car.fuel = Math.max(0, car.fuel - Math.abs(vF) * dt * 0.0042 * (0.3 + 0.7 * thrNow) * rules.fuelPct / 100);
+    if (rules.fuelOn && !race.fuelPlan) car.fuel = Math.max(0, car.fuel - Math.abs(vF) * dt * 0.0042 * (0.3 + 0.7 * thrNow) * rules.fuelPct / 100);
     if (rules.tireOn && !car.air) {
       const rough = (surf === S.GRAVEL || surf === S.SAND || surf === S.DIRT) ? 1.4 : 1;
       car.tires = Math.max(0, car.tires - (Math.abs(vF) * dt * 0.0028 + Math.min(car.slip, 250) * dt * 0.012) * rough * rules.tirePct / 100);
@@ -4540,8 +4540,16 @@ function aiControl(car, race, dt) {
   // --- Boxenstopp-Entscheidung ---
   const lapsLeft = race.laps - car.lapTimes.length;
   // Verbrauch pro Runde: gemessen oder aus Streckenlänge geschätzt
-  const fuelLap = ai.fuelLap || rt.L * 0.0042 * 0.8 * rules.fuelPct / 100;
-  const needFuel = rules.fuelOn && car.fuel < fuelLap * 1.35 && car.fuel < fuelLap * (lapsLeft - 0.1);
+  const fuelLap = race.fuelPlan ? 100 / race.fuelPlan.T : ai.fuelLap || rt.L * 0.0042 * 0.8 * rules.fuelPct / 100;
+  // mit Tankpflicht: erst an der letzten Gelegenheit stoppen, die der Tank noch hergibt
+  let needFuel = rules.fuelOn && car.fuel < fuelLap * 1.35 && car.fuel < fuelLap * (lapsLeft - 0.1);
+  if (race.fuelPlan) {
+    // Tankpflicht: genau rechnen – stoppen, wenn der Sprit weder bis ins Ziel noch bis zur Box in der nächsten Runde reicht
+    const fp = race.fuelPlan, pos = clamp(car.s / rt.L, 0, 1), have = car.fuel / 100 * fp.T;
+    const rem = car.lap === 0 ? race.laps + (1 - pos) : Math.max(0, race.laps - car.lapTimes.length - pos);
+    const toBox = (((fp.e - pos) % 1) + 1) % 1;
+    needFuel = have < rem + 0.06 && have < toBox + 1 + 0.2;
+  }
   ai.wantPit = rules.pits && rt.pit && !car.finished && race.state === 'running' && (
     (rules.dmgOn && car.damage > 58 && lapsLeft > 1) || needFuel ||
     (rules.tireOn && car.tires < 22 && lapsLeft > 1));
@@ -4634,14 +4642,17 @@ function aiControl(car, race, dt) {
       const sl = { x: path[ai.slot].x + (p.ox || 0) * 11, y: path[ai.slot].y + (p.oy || 0) * 11 };
       const toStop = (ai.slot - bi) * LINE_STEP + (bd < 4 ? 0 : 0);
       if (toStop <= 0) vt = 0; else vt = Math.min(vt, Math.sqrt(2 * 260 * toStop));
-      if (dist(car.x, car.y, sl.x, sl.y) < 8 || toStop <= 0) {
+      // Stau in der Box (alle müssen tanken): wer in der Boxenzone hinter einem anderen steht, wird an Ort und Stelle bedient
+      ai.boxWait = car.inBox && Math.abs(sp) < 4 ? (ai.boxWait || 0) + dt : 0;
+      const jam = race.fuelPlan && ai.boxWait > 0.5;
+      if (dist(car.x, car.y, sl.x, sl.y) < 8 || toStop <= 0 || jam) {
         vt = 0;
         if (Math.abs(sp) < 6 && car.inBox) {
           const q = [];
           if (rules.dmgOn && car.damage > 8) q.push('repair');
           if (rules.tireOn && car.tires < 75) q.push('tires');
-          if (rules.fuelOn && car.fuel < 85) q.push('fuel');
-          if (!q.length) q.push('fuel');
+          if (rules.fuelOn && (car.fuel < 85 || (race.fuelPlan && !car.refueled))) q.push('fuel');
+          if (!q.length && !(race.fuelPlan && car.refueled)) q.push('fuel');
           for (const k of q) queueService(car, k, race);
           ai.mode = 'service';
         }
@@ -4673,7 +4684,14 @@ function aiControl(car, race, dt) {
   if (race.state === 'running' && ai.mode !== 'service' && car.freeze <= 0 && !(ai.mode === 'pitIn' && vt === 0)) {
     if (Math.abs(sp) < 12) car.stuckT += dt; else car.stuckT = Math.max(0, car.stuckT - dt * 2);
     if (car.stuckT > 1.3 && ai.revT <= 0) ai.revT = 0.9;
-    if (car.stuckT > 5) resetCar(car, race);
+    if (car.stuckT > 5) {
+      if (ai.mode === 'pitIn' && rt.pit) {
+        // im Boxengassen-Stau festgefahren: direkt auf den eigenen Halteplatz setzen statt zurück auf die Strecke (sonst verpasst das Auto seinen Stopp)
+        const p = rt.pit, q = p.path[ai.slot];
+        car.x = car.prevX = q.x + (p.ox || 0) * 11; car.y = car.prevY = q.y + (p.oy || 0) * 11;
+        car.vx = car.vy = car.av = 0; car.stuckT = 0; ai.pitIdx = ai.slot; ai.revT = 0;
+      } else resetCar(car, race);
+    }
   }
   if (ai.revT > 0) { ai.revT -= dt; out.thr = 0; out.brk = 1; out.steer = -out.steer; }
   // weit weg von der Linie (z. B. Abkürzung verpasst) → zurücksetzen
@@ -4700,21 +4718,21 @@ function queueService(car, kind, race) {
   sv.q.push(kind);
 }
 const SERVICE_NAME = { repair: 'Reparatur', fuel: 'Tanken', tires: 'Reifenwechsel' };
-function serviceDuration(car, kind) {
+function serviceDuration(car, kind, race) {
   if (kind === 'repair') return 0.8 + car.damage * 0.03;
-  if (kind === 'fuel') return 0.6 + (100 - car.fuel) * 0.022;
+  if (kind === 'fuel') return race && race.fuelPlan ? 1.75 + 0.75 * (car.fuelSlow || 0) : 0.6 + (100 - car.fuel) * 0.022;   // Pflichtstopp: feste Dauer; schnelle Klassen etwas kürzer, weil sie in der Boxengasse mehr Zeit verlieren
   return 2.4;
 }
 /** Boxendienst abarbeiten. Gibt true zurück, solange das Auto steht. */
 function updateService(car, dt, race) {
   const sv = car.service;
-  if (!sv.cur && sv.q.length) { sv.cur = sv.q.shift(); sv.t = 0; sv.dur = serviceDuration(car, sv.cur); }
+  if (!sv.cur && sv.q.length) { sv.cur = sv.q.shift(); sv.t = 0; sv.dur = serviceDuration(car, sv.cur, race); }
   if (!sv.cur) return false;
   sv.t += dt;
   car.vx = car.vy = car.av = 0;
   if (sv.t >= sv.dur) {
     if (sv.cur === 'repair') car.damage = 0;
-    if (sv.cur === 'fuel') car.fuel = 100;
+    if (sv.cur === 'fuel') { car.fuel = 100; car.refueled = true; }
     if (sv.cur === 'tires') car.tires = 100;
     if (car.human >= 0) Sound.service();
     sv.cur = null;
@@ -5319,6 +5337,7 @@ function createRace(cfg) {
   if (cfg.mode === 'rally') { R.trackName = Rally.cur ? Rally.cur.stage.name : src.name; R.secInfo = Rally.cur ? { k: Rally.cur.sec, n: Rally.cur.stage.sections.length } : null; }
   R.powerups = !!R.rules.powerups && !R.career && ['quick', 'elim', 'champ', 'test'].includes(cfg.mode);
   R.pads = []; R.boxes = []; R.slicks = [];
+  setupFuelPlan(R);
   if (R.powerups) PU.setup(R);
   Particles.clear();
   return R;
@@ -5347,6 +5366,7 @@ function passCheckpoint(car, k, race) {
   if (k === 0) {
     if (car.lap === 0) { car.lap = 1; car.lapStart = 0; car.fuelAtLap = car.fuel; }
     else completeLap(car, race);
+    if (race.fuelPlan && car.human >= 0 && !car.refueled && !car.finished && car.lap === car.fuelDue) { flashMsg(car, 'DIESE RUNDE TANKEN!', '#ffc83d'); car.msgT = 4; }
   }
   if (car.finished) return;
   car.nextCp = (k + 1) % n;
@@ -5457,6 +5477,32 @@ function finishCar(car, race) {
 }
 function flashMsg(car, text, color) { car.msg = text; car.msgCol = color; car.msgT = 2.5; }
 
+/**
+ * Tankpflicht: Jeder muss mindestens einmal nachtanken – schnelle Klassen früh, langsame spät.
+ * Alle Tanks sind gleich groß (reichen von der ersten Boxengelegenheit bis ins Ziel), aber je schneller
+ * die Klasse, desto weniger Sprit ist beim Start an Bord. Der Verbrauch hängt nur vom Fortschritt auf der
+ * Strecke ab, und die Standzeit ist so gestaffelt (1,75–2,5 s), dass der Stopp jede Klasse etwa gleich viel
+ * Zeit kostet (gemessen rund 6,1–6,6 s inklusive Boxengasse).
+ */
+function setupFuelPlan(R) {
+  const rt = R.rt, N = R.laps;
+  R.fuelPlan = null;
+  if (!R.rules.fuelOn || !R.rules.pits || !rt.pit || N < 2 || ['trial', 'demo', 'derby', 'rally', 'sim'].includes(R.mode)) return;
+  const e = projectLine(rt, rt.pit.box.x, rt.pit.box.y, null).s / rt.L;        // Lage der Box in der Runde (0 = Start/Ziel)
+  const opp = [];                                                              // Boxengelegenheiten als Renndistanz in Runden
+  for (let j = 0; j < N; j++) { const d = j + e; if (d >= 0.3 && d <= N - 0.25) opp.push(d); }
+  if (!opp.length) return;
+  const T = (N - opp[0]) + 0.5;                                                // Reichweite eines vollen Tanks in Runden
+  const vs = CLASSES.map(c => c.maxSpeed), vMin = Math.min(...vs), vMax = Math.max(...vs);
+  R.fuelPlan = { T, perPx: 100 / (T * rt.L), e };
+  for (const car of R.cars) {
+    const slow = (vMax - car.cls.maxSpeed) / (vMax - vMin), want = N * (0.3 + 0.45 * slow);
+    let d = opp[0]; for (const o of opp) if (Math.abs(o - want) < Math.abs(d - want)) d = o;
+    car.fuel = Math.min(1, (d + 0.4) / T) * 100;
+    car.fuelDue = e < 0.3 ? Math.floor(d) : Math.floor(d) + 1;                 // in dieser Runde spätestens in die Box
+    car.refueled = false; car.fuelSlow = slow;
+  }
+}
 /** Ein Physik-Schritt des Rennens. */
 function updateRace(race, dt) {
   const rt = race.rt;
@@ -5529,6 +5575,18 @@ function updateRace(race, dt) {
       if ((mx || my) && mx * cp.nx + my * cp.ny > 0 && segIntersect(car.prevX, car.prevY, car.x, car.y, cp.x1, cp.y1, cp.x2, cp.y2)) passCheckpoint(car, car.nextCp, race);
     }
     const pr = projectLine(rt, car.x, car.y, car.idx, car.level);
+    if (race.fuelPlan && running && !car.finished) {
+      // Tankpflicht: Verbrauch nach Fortschritt auf der Strecke – unabhängig von Linienwahl, Drehern und Verkehr
+      let ds = pr.s - car.s; if (ds < -rt.L / 2) ds += rt.L; else if (ds > rt.L / 2) ds -= rt.L;
+      // nur neu gewonnene Strecke zählt (Höchststand), damit Hin-und-her-Rutschen keinen Sprit kostet; Sprünge (Reset) zählen nicht
+      if (Math.abs(ds) >= 40) car.progMax = (car.progMax || 0) + ds;
+      car.prog = (car.prog || 0) + ds;
+      if (car.prog > (car.progMax || 0)) {
+        // nie mehr als den tatsächlich gefahrenen Weg berechnen (ein stehendes Auto verbraucht nichts)
+        const mv = Math.hypot(car.x - car.prevX, car.y - car.prevY);
+        car.fuel = Math.max(0, car.fuel - Math.min(car.prog - (car.progMax || 0), mv * 1.05) * race.fuelPlan.perPx); car.progMax = car.prog;
+      }
+    }
     car.idx = pr.i; car.s = pr.s;
     if (!SURF[car.surf].oob && !car.air && pr.d < 60 && !car.wrong && car.sink <= 0 && (rt.lvl[pr.i] || 0) === car.level) car.lastValidS = car.s;
     // Falsche Richtung
@@ -5536,6 +5594,11 @@ function updateRace(race, dt) {
     if (running && along < -40 && pr.d < 90 && race.mode !== 'derby') car.wrongT += dt; else car.wrongT = Math.max(0, car.wrongT - dt * 2);
     car.wrong = car.wrongT > 1.0;
     car.key = progressKey(car, rt, race);
+    // In der Boxengasse zählen Checkpoints (auch Start/Ziel) nach Fortschritt – wer dort an einer Linie vorbeirutscht, verliert keine Runde
+    if (running && !car.finished && car.surf === S.PIT && race.mode !== 'derby' && rt.cps.length) {
+      let df = car.s / rt.L - rt.cps[car.nextCp].frac; if (df < -0.5) df += 1;
+      if (df > 0.012 && df < 0.2) passCheckpoint(car, car.nextCp, race);
+    }
     // Checkpoint ausgelassen? (deutlich hinter dem nächsten Checkpoint, ohne ihn durchfahren zu haben)
     if (car.human >= 0 && running && !car.finished && car.nextCp > 0 && race.mode !== 'derby') {
       const f = car.s / rt.L, cf = rt.cps[car.nextCp].frac;
@@ -6215,6 +6278,13 @@ function drawPlayerCard(ctx, c, race, x, y, w, h) {
   if (!bars.length) { ctx.fillStyle = '#6f7d94'; ctx.font = '500 10px "Chakra Petch",sans-serif'; ctx.fillText('Sprit, Reifen und Schaden aus', x + 12, by + 8); }
   if (c.wrong && !c.finished) { ctx.fillStyle = '#ff4d5e'; ctx.font = '700 10px "Chakra Petch",sans-serif'; ctx.fillText('FALSCHE RICHTUNG', x + 12, y + h - 4); }
   else if (c.service.cur) { ctx.fillStyle = '#ffcd32'; ctx.font = '700 10px "Chakra Petch",sans-serif'; ctx.fillText('BOX: ' + SERVICE_NAME[c.service.cur] + ' …', x + 12, y + h - 4); }
+  else if (race.fuelPlan && !c.finished && c.fuelDue) {
+    // Tankpflicht: Frist anzeigen, in der fälligen Runde blinkend
+    const due = c.lap >= c.fuelDue, blink = Math.sin(race.time * 9) > 0;
+    ctx.font = '700 10px "Chakra Petch",sans-serif';
+    if (c.refueled) { ctx.fillStyle = '#46d68a'; ctx.fillText('Tankstopp erledigt', x + 12, y + h - 4); }
+    else { ctx.fillStyle = due ? (blink ? '#ff4d5e' : '#ffc83d') : '#ffc83d'; ctx.fillText(due ? 'JETZT TANKEN (Box, ▼)' : 'Tanken bis Runde ' + c.fuelDue, x + 12, y + h - 4); }
+  }
 }
 
 /** Abstand zum Vorder- und Hintermann (Sekunden, geschätzt aus Streckenabstand und Tempo). */
@@ -6429,7 +6499,7 @@ const UI = {
     raceCol += '<h3 style="margin-top:22px">Regeln</h3>';
     const ruleRow = (label, on, pctKey, onKey) => `<div class="row"><label class="l">${label}</label>${tog('rule', on).replace('data-act="rule"', `data-act="rule" data-v="${onKey}"`)}
       <input type="range" min="25" max="300" step="25" value="${rules[pctKey]}" data-act="pct" data-v="${pctKey}" ${on ? '' : 'disabled'}><span class="pct">${rules[pctKey]}%</span></div>`;
-    raceCol += ruleRow('Spritverbrauch', rules.fuelOn, 'fuelPct', 'fuelOn');
+    raceCol += `<div class="row"><label class="l">Tankpflicht</label>${tog('rule', rules.fuelOn).replace('data-act="rule"', 'data-act="rule" data-v="fuelOn"')}<span class="note">mind. 1 Tankstopp je Rennen – schnelle Autos früh, langsame spät</span></div>`;
     raceCol += ruleRow('Reifenverschleiß', rules.tireOn, 'tirePct', 'tireOn');
     raceCol += ruleRow('Schadensmodell', rules.dmgOn, 'dmgPct', 'dmgOn');
     raceCol += `<div class="row"><label class="l">Boxenstopps</label>${tog('rule', rules.pits).replace('data-act="rule"', 'data-act="rule" data-v="pits"')}</div>`;

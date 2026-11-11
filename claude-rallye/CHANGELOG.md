@@ -4,6 +4,19 @@ Top-Down-Arcade-Rennspiel in einer einzigen Datei (HTML5 + Canvas + JavaScript).
 Die aktuelle Version liegt immer in `index.html`. Die Versionsnummer steht unten rechts im Hauptmenü.
 Unter `versions/` liegen höchstens 3 Versionsstände, ältere werden gelöscht (sie bleiben in der Git-Historie abrufbar). **Rollback:** gewünschte Datei aus `versions/` als `index.html` verwenden. Alle Änderungen sind hier dokumentiert.
 
+## 1.10.0 (11.11.2026)
+Tankpflicht: Jeder muss mindestens einmal pro Rennen nachtanken.
+- **Regel:** Gilt in allen Rundenrennen ab 2 Runden auf Strecken mit Box, wenn „Tankpflicht“ und „Boxenstopps“ eingeschaltet sind (Standard). Nicht im Zeitfahren, Derby und in Rallye-Etappen.
+- **Schnelle Autos früh, langsame spät:** Alle Tanks sind gleich groß, aber je schneller die Klasse, desto weniger Sprit ist beim Start an Bord. Die Frist liegt je nach Höchsttempo zwischen etwa 30 % (Formel) und 75 % (Truck, Kart) der Renndistanz. Beispiel 8 Runden: Formel bis Runde 2, Blitz 3, Muscle/Allround/Rallye 4, Elektro/Buggy/Brummer 5, Kart/Truck 6.
+- **Ein Stopp reicht immer:** Ein voller Tank reicht von der ersten Boxengelegenheit bis ins Ziel. Früher tanken ist erlaubt.
+- **Ausgeglichen:** Der Verbrauch hängt nur vom Fortschritt auf der Strecke ab (nicht von Gas, Linienwahl oder Drehern). Die Standzeit beim Tanken ist fest und gestaffelt (Formel 1,75 s … Truck 2,5 s), weil schnelle Autos in der Boxengasse mehr Zeit verlieren. Gemessen kostet der Stopp jede Klasse 6,3–6,7 s.
+- **Anzeige:** In der Fahrerkarte steht „Tanken bis Runde X“, in der fälligen Runde blinkt „JETZT TANKEN (Box, ▼)“, dazu eine Meldung zu Rundenbeginn. Nach dem Stopp: „Tankstopp erledigt“.
+- **Wer nicht tankt,** bleibt mit leerem Tank fast stehen (wie bisher: nur noch 22 % Leistung).
+- **KI:** rechnet genau und stoppt an der letzten Gelegenheit, die der Tank hergibt. Bei Stau in der Box (alle müssen gleichzeitig tanken) wird ein wartendes KI-Auto an Ort und Stelle bedient.
+- **Behoben:** In der Boxengasse zählen Checkpoints und Start/Ziel jetzt nach Fortschritt. Vorher konnte ein Auto dort an der Linie vorbeirutschen und eine Runde verlieren.
+- Im Regelmenü heißt die Zeile jetzt „Tankpflicht“ (Ein/Aus); der Verbrauchsregler entfällt.
+- Neuer Test `tests/fuel.py`.
+
 ## 1.9.0 (10.11.2026)
 Neue Automodelle und überarbeitete Streckengrafik.
 - **Autos als echte 3D-Modelle:** Alle 10 Fahrzeugklassen sind neu gebaut. Statt Quadern haben sie geformte Karosserien mit schräger Haube, geneigten Scheiben, Dachsäulen, Radhäusern, runden Rädern mit Felgen (Speichen drehen sich beim Fahren), Scheinwerfern, Rückleuchten, Spiegeln und klassentypischen Anbauteilen (Heckflügel, Überrollkäfig, Lichtleiste, Ladefläche, Kofferaufbau, Fahrer mit Helm …).

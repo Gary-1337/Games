@@ -207,7 +207,7 @@ function stepCarPhysics(car, inp, dt, race) {
   // --- Verbrauch ---
   if (race.state === 'running' && !car.finished) {
     const thrNow = car.air ? 0 : thr;
-    if (rules.fuelOn) car.fuel = Math.max(0, car.fuel - Math.abs(vF) * dt * 0.0042 * (0.3 + 0.7 * thrNow) * rules.fuelPct / 100);
+    if (rules.fuelOn && !race.fuelPlan) car.fuel = Math.max(0, car.fuel - Math.abs(vF) * dt * 0.0042 * (0.3 + 0.7 * thrNow) * rules.fuelPct / 100);
     if (rules.tireOn && !car.air) {
       const rough = (surf === S.GRAVEL || surf === S.SAND || surf === S.DIRT) ? 1.4 : 1;
       car.tires = Math.max(0, car.tires - (Math.abs(vF) * dt * 0.0028 + Math.min(car.slip, 250) * dt * 0.012) * rough * rules.tirePct / 100);
@@ -434,8 +434,16 @@ function aiControl(car, race, dt) {
   // --- Boxenstopp-Entscheidung ---
   const lapsLeft = race.laps - car.lapTimes.length;
   // Verbrauch pro Runde: gemessen oder aus Streckenlänge geschätzt
-  const fuelLap = ai.fuelLap || rt.L * 0.0042 * 0.8 * rules.fuelPct / 100;
-  const needFuel = rules.fuelOn && car.fuel < fuelLap * 1.35 && car.fuel < fuelLap * (lapsLeft - 0.1);
+  const fuelLap = race.fuelPlan ? 100 / race.fuelPlan.T : ai.fuelLap || rt.L * 0.0042 * 0.8 * rules.fuelPct / 100;
+  // mit Tankpflicht: erst an der letzten Gelegenheit stoppen, die der Tank noch hergibt
+  let needFuel = rules.fuelOn && car.fuel < fuelLap * 1.35 && car.fuel < fuelLap * (lapsLeft - 0.1);
+  if (race.fuelPlan) {
+    // Tankpflicht: genau rechnen – stoppen, wenn der Sprit weder bis ins Ziel noch bis zur Box in der nächsten Runde reicht
+    const fp = race.fuelPlan, pos = clamp(car.s / rt.L, 0, 1), have = car.fuel / 100 * fp.T;
+    const rem = car.lap === 0 ? race.laps + (1 - pos) : Math.max(0, race.laps - car.lapTimes.length - pos);
+    const toBox = (((fp.e - pos) % 1) + 1) % 1;
+    needFuel = have < rem + 0.06 && have < toBox + 1 + 0.2;
+  }
   ai.wantPit = rules.pits && rt.pit && !car.finished && race.state === 'running' && (
     (rules.dmgOn && car.damage > 58 && lapsLeft > 1) || needFuel ||
     (rules.tireOn && car.tires < 22 && lapsLeft > 1));
@@ -528,14 +536,17 @@ function aiControl(car, race, dt) {
       const sl = { x: path[ai.slot].x + (p.ox || 0) * 11, y: path[ai.slot].y + (p.oy || 0) * 11 };
       const toStop = (ai.slot - bi) * LINE_STEP + (bd < 4 ? 0 : 0);
       if (toStop <= 0) vt = 0; else vt = Math.min(vt, Math.sqrt(2 * 260 * toStop));
-      if (dist(car.x, car.y, sl.x, sl.y) < 8 || toStop <= 0) {
+      // Stau in der Box (alle müssen tanken): wer in der Boxenzone hinter einem anderen steht, wird an Ort und Stelle bedient
+      ai.boxWait = car.inBox && Math.abs(sp) < 4 ? (ai.boxWait || 0) + dt : 0;
+      const jam = race.fuelPlan && ai.boxWait > 0.5;
+      if (dist(car.x, car.y, sl.x, sl.y) < 8 || toStop <= 0 || jam) {
         vt = 0;
         if (Math.abs(sp) < 6 && car.inBox) {
           const q = [];
           if (rules.dmgOn && car.damage > 8) q.push('repair');
           if (rules.tireOn && car.tires < 75) q.push('tires');
-          if (rules.fuelOn && car.fuel < 85) q.push('fuel');
-          if (!q.length) q.push('fuel');
+          if (rules.fuelOn && (car.fuel < 85 || (race.fuelPlan && !car.refueled))) q.push('fuel');
+          if (!q.length && !(race.fuelPlan && car.refueled)) q.push('fuel');
           for (const k of q) queueService(car, k, race);
           ai.mode = 'service';
         }
@@ -567,7 +578,14 @@ function aiControl(car, race, dt) {
   if (race.state === 'running' && ai.mode !== 'service' && car.freeze <= 0 && !(ai.mode === 'pitIn' && vt === 0)) {
     if (Math.abs(sp) < 12) car.stuckT += dt; else car.stuckT = Math.max(0, car.stuckT - dt * 2);
     if (car.stuckT > 1.3 && ai.revT <= 0) ai.revT = 0.9;
-    if (car.stuckT > 5) resetCar(car, race);
+    if (car.stuckT > 5) {
+      if (ai.mode === 'pitIn' && rt.pit) {
+        // im Boxengassen-Stau festgefahren: direkt auf den eigenen Halteplatz setzen statt zurück auf die Strecke (sonst verpasst das Auto seinen Stopp)
+        const p = rt.pit, q = p.path[ai.slot];
+        car.x = car.prevX = q.x + (p.ox || 0) * 11; car.y = car.prevY = q.y + (p.oy || 0) * 11;
+        car.vx = car.vy = car.av = 0; car.stuckT = 0; ai.pitIdx = ai.slot; ai.revT = 0;
+      } else resetCar(car, race);
+    }
   }
   if (ai.revT > 0) { ai.revT -= dt; out.thr = 0; out.brk = 1; out.steer = -out.steer; }
   // weit weg von der Linie (z. B. Abkürzung verpasst) → zurücksetzen
@@ -594,21 +612,21 @@ function queueService(car, kind, race) {
   sv.q.push(kind);
 }
 const SERVICE_NAME = { repair: 'Reparatur', fuel: 'Tanken', tires: 'Reifenwechsel' };
-function serviceDuration(car, kind) {
+function serviceDuration(car, kind, race) {
   if (kind === 'repair') return 0.8 + car.damage * 0.03;
-  if (kind === 'fuel') return 0.6 + (100 - car.fuel) * 0.022;
+  if (kind === 'fuel') return race && race.fuelPlan ? 1.75 + 0.75 * (car.fuelSlow || 0) : 0.6 + (100 - car.fuel) * 0.022;   // Pflichtstopp: feste Dauer; schnelle Klassen etwas kürzer, weil sie in der Boxengasse mehr Zeit verlieren
   return 2.4;
 }
 /** Boxendienst abarbeiten. Gibt true zurück, solange das Auto steht. */
 function updateService(car, dt, race) {
   const sv = car.service;
-  if (!sv.cur && sv.q.length) { sv.cur = sv.q.shift(); sv.t = 0; sv.dur = serviceDuration(car, sv.cur); }
+  if (!sv.cur && sv.q.length) { sv.cur = sv.q.shift(); sv.t = 0; sv.dur = serviceDuration(car, sv.cur, race); }
   if (!sv.cur) return false;
   sv.t += dt;
   car.vx = car.vy = car.av = 0;
   if (sv.t >= sv.dur) {
     if (sv.cur === 'repair') car.damage = 0;
-    if (sv.cur === 'fuel') car.fuel = 100;
+    if (sv.cur === 'fuel') { car.fuel = 100; car.refueled = true; }
     if (sv.cur === 'tires') car.tires = 100;
     if (car.human >= 0) Sound.service();
     sv.cur = null;
