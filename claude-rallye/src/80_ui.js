@@ -352,7 +352,7 @@ const UI = {
           <div class="row"><label class="l">Musik-Lautstärke</label><input type="range" min="0" max="100" value="${o.musicVol}" data-act="omvol"><span class="pct">${o.musicVol}%</span></div>
           <div class="row"><label class="l">Musik im Rennen</label>${tog('oracemus', o.raceMusic)}</div>
           <div class="row"><label class="l">Touch-Steuerung</label>${seg('otouch', ['Automatisch', 'An', 'Aus'], o.touch || 0)}</div>
-          <div class="row"><label class="l">Kamera-Zoom (allein)</label>${seg('ocam', ['Aus', 'Folgen', 'Nah'], o.camera != null ? o.camera : 1)}</div>
+          <div class="row"><label class="l">Kamera-Zoom (allein)</label>${seg('ocam', ['Aus', 'Folgen', 'Nah', 'Cockpit'], o.camera != null ? o.camera : 1)}</div>
           <div class="row"><label class="l">Checkpoints zeigen</label>${tog('ocps', o.showCps)}</div>
           <div class="row"><label class="l">Grafikqualität</label>${seg('ogfx', ['Auto', 'Hoch', 'Mittel', 'Niedrig'], Math.max(0, ['auto', 'high', 'mid', 'low'].indexOf(o.gfx || 'auto')))}</div>
           <div class="note" style="margin:-2px 0 8px 0">Auto senkt die Qualität selbst, wenn das Spiel ruckelt. Gilt ab dem nächsten Rennen.</div>
@@ -429,7 +429,7 @@ const UI = {
     $('scr-pause').innerHTML = `<div class="dim" style="background:rgba(0,0,0,.55)"></div><div class="box"><h2>PAUSE</h2>
       <button class="btn primary big" data-act="resume">Weiter</button>
       <button class="btn" data-act="restart">Neu starten</button>
-      ${R.cars.filter(c => c.human >= 0).length === 1 ? `<button class="btn" data-act="camera">Kamera: ${['Ganze Strecke', 'Folgen', 'Nah'][Options.data.camera != null ? Options.data.camera : 1]} (C)</button>` : ''}
+      ${R.cars.filter(c => c.human >= 0).length === 1 ? `<button class="btn" data-act="camera">Kamera: ${['Ganze Strecke', 'Folgen', 'Nah', 'Cockpit'][Options.data.camera != null ? Options.data.camera : 1]} (C)</button>` : ''}
       <button class="btn" data-act="quit">${quit}</button>
       <p class="note" style="text-align:center;margin:8px 0 0">P / Esc: weiter · C: Kamera-Zoom</p></div>`;
     showScreen('scr-pause');

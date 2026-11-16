@@ -106,6 +106,10 @@ function updateCamera(race) {
   return cam;
 }
 function drawRace(ctx, race) {
+  if (Cockpit.active(race)) {
+    try { Cockpit.draw(ctx, race); drawRaceTail(ctx, race); return; }
+    catch (e) { console.warn('Cockpit-Ansicht abgeschaltet:', e); Cockpit.failed = true; Cockpit.gl = null; Options.data.camera = 2; toast('Cockpit-Ansicht nicht verfügbar'); }
+  }
   const cam = updateCamera(race);
   CAR_DETAIL = (cam ? cam.z : 1) * RK >= 1.6 && Gfx.level() > 0 ? 1 : 0;
   if (cam) {
@@ -198,7 +202,10 @@ function drawRace(ctx, race) {
   const gv = race.mode === 'trial' ? ghostView(race) : null;
   if (gv) { const [gx, gy] = map(...P(gv.x, gv.y, gv.z + 16)); ctx.fillStyle = 'rgba(191,232,255,.85)'; ctx.font = '600 10px "Chakra Petch",sans-serif'; ctx.textAlign = 'center'; ctx.fillText('GHOST', gx, gy - 4); }
   if (cam) ctx.restore();
-  // Countdown
+  drawRaceTail(ctx, race);
+}
+/** Countdown und Schlussmeldung (über jeder Kamera) */
+function drawRaceTail(ctx, race) {
   if (race.state === 'countdown' || race.goT > 0) drawCountdown(ctx, race);
   if (race.state === 'ending' || race.state === 'done') {
     ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(0, 360, W, 80);

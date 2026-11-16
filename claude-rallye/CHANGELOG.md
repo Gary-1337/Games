@@ -4,6 +4,20 @@ Top-Down-Arcade-Rennspiel in einer einzigen Datei (HTML5 + Canvas + JavaScript).
 Die aktuelle Version liegt immer in `index.html`. Die Versionsnummer steht unten rechts im Hauptmenü.
 Unter `versions/` liegen höchstens 3 Versionsstände, ältere werden gelöscht (sie bleiben in der Git-Historie abrufbar). **Rollback:** gewünschte Datei aus `versions/` als `index.html` verwenden. Alle Änderungen sind hier dokumentiert.
 
+## 1.11.0 (16.11.2026)
+Neue Kamera: Cockpit-Ansicht – Sicht hinter dem Lenkrad (Grundversion).
+- **Umschalten:** Im Rennen mit **C** (oder im Pausenmenü) als vierte Kamerastufe nach „Ganze Strecke“, „Folgen“ und „Nah“; auch in den Optionen unter „Kamera-Zoom“ wählbar. Nur im Einzelspieler; bei 2–4 Spielern bleibt die Ansicht von oben.
+- **3D-Welt:** Eigener WebGL-Renderer. Der Boden ist die Streckengrafik auf den echten Hügeln und Rampen, dazu Bäume (Laub, Tannen mit Schnee, Palmen), Büsche, Steine, Häuser mit Dach und Fenstern, Tribünen mit Zuschauern, Container, Leitplanken, Zäune, Werbebanden, Reifenstapel, Laternen, Brücken, Schranken, Checkpoint-Fahnen, Power-up-Kisten und Ölflecken. Am Horizont Berge (Wüste: Tafelberge, Stadt: Skyline), Himmel mit Sonne, Nebel je nach Wetter.
+- **Gegner** sind die 3D-Modelle aus 1.9.0 mit Bremslichtern und Schatten; im Zeitfahren fährt der Geist durchscheinend mit.
+- **Licht:** Abends und nachts leuchten die eigenen Scheinwerfer die Strecke aus, Laternen werfen Lichtkegel.
+- **Cockpit je Klasse:** eigenes Lenkrad (Sport-, Tiefbett-, Holz-, Vierspeichen-, Formel- und LKW-Lenkrad, Elektro-Yoke, Kartlenkrad), das sich mit der Lenkung dreht, Hände am Lenkrad, Armaturen (Rundinstrumente, Digitalanzeige mit Schaltblitzen, Touchscreen beim Elektro), Rahmen (Dach und Säulen, Überrollkäfig bei Rallye und Buggy, Halo und Seitenkästen bei der Formel, geteilte Scheibe beim Truck), Schalthebel im Rallyewagen.
+- **Rückspiegel** zeigen das echte Bild nach hinten: Innenspiegel, bei Formel und Truck zwei Außenspiegel, beim Kart keiner.
+- **Regen und Schnee** laufen über die Scheibe; auf Schotter und Gras wackelt die Sicht leicht, in Kurven geht der Kopf mit.
+- Meldungen (Zwischenzeit, falsche Richtung, Checkpoint verpasst, Boxenmenü) stehen in der Cockpit-Ansicht mittig oben.
+- Ohne WebGL2 wird die Stufe übersprungen.
+- Noch nicht in der Cockpit-Ansicht: Reifenspuren, Staub- und Rauchwolken.
+- Neuer Test `tests/cockpit.py`.
+
 ## 1.10.1 (11.11.2026)
 Boxenstopp repariert.
 - **Behoben:** Nach einem Stopp kam man kaum aus der Box, weil Lenken (◀ ▶) und Bremsen (▼) beim Losfahren sofort wieder Reparatur, Reifen oder Tanken bestellt haben. Jetzt nimmt die Box nur Bestellungen an, solange das Auto steht und kein Gas gegeben wird, und nach dem Stopp ist sie gesperrt, bis man sie verlassen hat („Fertig – Gas geben!“).

@@ -15,10 +15,11 @@ function addRecord(trackId, rec) {
 const getRecords = id => store.get('cr_lb_' + id, []);
 /** Zoomstufe der Kamera laut Optionen (1 = aus). */
 const CAM_ZOOM = [1, 1.55, 2.1];
+const CAM_NAMES = ['Ganze Strecke (Zoom aus)', 'Folgen', 'Nah', 'Cockpit (hinter dem Lenkrad)'];
 const camZoom = () => CAM_ZOOM[Options.data.camera != null ? Options.data.camera : 1] || 1;
 /** Auflösung der vorberechneten Szene: so fein, dass sie auf dem Bildschirm (Bühnen-Skalierung × Pixeldichte × Zoom) scharf bleibt. */
 function sceneRes(solo, demo) {
-  const z = solo && !demo && camZoom() > 1 ? camZoom() : 1, q = Gfx.level();
+  const z = solo && !demo && isCockpitCam() ? 3 : solo && !demo && camZoom() > 1 ? camZoom() : 1, q = Gfx.level();
   const max = demo ? Math.min(2, q + 1) : q === 0 ? (z > 1 ? 2 : 1) : q === 1 ? 2 : Touch.detect() ? 2 : 3;
   return clamp(Math.ceil(RK * z - 0.2), 1, max);
 }
@@ -68,9 +69,9 @@ function cycleCameraRes(race) {
 }
 /** Kamera im Rennen umschalten (Taste C / Pausenmenü); Szene bei Bedarf in hoher Auflösung neu bauen. */
 function cycleCamera(race) {
-  const o = Options.data; o.camera = ((o.camera != null ? o.camera : 1) + 1) % CAM_ZOOM.length; Options.save();
+  const o = Options.data; o.camera = ((o.camera != null ? o.camera : 1) + 1) % (Cockpit.init() ? 4 : 3); Options.save();
   if (race) { cycleCameraRes(race); race.cam = null; }
-  toast('Kamera: ' + ['Ganze Strecke (Zoom aus)', 'Folgen', 'Nah'][o.camera]);
+  toast('Kamera: ' + CAM_NAMES[o.camera]);
 }
 
 /**
