@@ -1,6 +1,6 @@
 # Claude Rallye – Arbeitsstand (Übergabe)
 
-Stand: 16.11.2026. Aktuell ist **Version 1.11.0** (`index.html`): Cockpit-Ansicht hinter dem Lenkrad als **Grundversion** (Nutzerwunsch: nur Einzelspieler, im Rennen umschaltbar, eigenes Cockpit je Klasse; erst Grundversion zeigen, dann ausbauen). Davor 1.10.x: Tankpflicht und Boxenstopp-Reparatur. Alles ist gebaut, getestet (alle 9 Testskripte grün), ins Repository übertragen und im Projekt abgelegt. **Es ist nichts halb fertig.** Details stehen im `CHANGELOG.md`.
+Stand: 16.11.2026. Aktuell ist **Version 1.11.0** (`index.html`): Cockpit-Ansicht hinter dem Lenkrad als **Grundversion** (Nutzerwunsch: nur Einzelspieler, im Rennen umschaltbar, eigenes Cockpit je Klasse; erst Grundversion zeigen, dann ausbauen). Der Nutzer hat sie angesehen: „sieht alles gut aus“. Davor 1.10.x: Tankpflicht und Boxenstopp-Reparatur. Alles ist gebaut, getestet (alle 9 Testskripte grün), ins Repository übertragen und im Projekt abgelegt. **Es ist nichts halb fertig.** Details stehen im `CHANGELOG.md`, der Einstieg für die nächste Sitzung in `FORTSETZUNG.md`.
 
 ## Vorgaben des Nutzers
 - Höchstens **3 Versionsstände** in `versions/`, ältere löschen (Git-Historie behält sie). Derzeit: `index-v1.10.0.html`, `index-v1.10.1.html`, `index-v1.11.0.html`.
