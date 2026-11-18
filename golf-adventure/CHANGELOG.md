@@ -1,5 +1,10 @@
 # Golf Adventure – Versionsverlauf
 
+## 0.9.3 – 19.11.2026
+- Größere Schwungleiste (bis 380 px, am Handy deutlich größer), komplett sichtbar
+- Chillige Hintergrundmusik (generiert: Akkordflächen, E-Piano, Bass, Besen, Hall), Option „Musik“
+- Mehr Umgebung: Blätterrauschen mit dem Wind, Grillen, Amsel, ferner Kuckuck, ferne Kuhglocken
+
 ## 0.9.2 – 19.11.2026
 - Runde Kanten statt Ecken: Fairways, Grüns, Bunker, Abschläge, Wasser und Wege werden geglättet (Chaikin) und als kantengeglättete Pfade gemalt; Testgelände und Range ohne Treppenstufen
 
