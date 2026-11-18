@@ -1,5 +1,10 @@
 # Golf Adventure – Versionsverlauf
 
+## 0.10.4 – 19.11.2026
+- Licht und Schatten: warme Nachmittagssonne aus Südwesten mit längeren, weichen Baumschatten; Sonne am Himmel passt zum Licht
+- Schatten schärfer und weiter sichtbar (hohe Qualität), folgen dem Blick ohne Flimmern; Bäume verschatten sich gegenseitig
+- Leichter Dunst in der Ferne
+
 ## 0.10.3 – 19.11.2026
 - Bäume nach dem Luftbild: rund 11 700 Bäume an ihren echten Standorten (aus dem Orthofoto von basemap.at erkannt, Kronengröße inklusive) statt zufällig verteilter Bäume
 - Bäche nach dem Luftbild nachgezeichnet: geschwungener Verlauf, Wasserspiegel fällt gleichmäßig (keine Stufen), Bachbett mit weichen Ufern
