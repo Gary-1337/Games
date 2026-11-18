@@ -1,5 +1,8 @@
 # Golf Adventure – Versionsverlauf
 
+## 0.9.1 – 19.11.2026
+- Gras deutlich schärfer: feine Detailtextur (Halme, Büschel) im Gelände-Shader, Sandkörnung im Bunker, Übergänge weniger verwaschen
+
 ## 0.9.0 – 18.11.2026
 Erste Version im GAMES-Repo (Testversion, Feinschliff folgt nach dem Testen).
 - Realistisches Top-Down-Golf (Three.js) für PC und Handy: Maus/Tastatur, Touch, Gamepad
