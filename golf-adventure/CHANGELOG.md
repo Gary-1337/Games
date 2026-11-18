@@ -1,5 +1,8 @@
 # Golf Adventure – Versionsverlauf
 
+## 0.10.1 – 19.11.2026
+- Musik pausiert im Pausemenü (Esc/P/❚❚) und läuft danach weiter
+
 ## 0.10.0 – 19.11.2026
 - Untergrund deutlich schärfer: Shader-Splatting mit echten Materialtexturen (Gras, Rough, Sand, Erde – ambientCG, CC0) samt Normal Maps, in jeder Entfernung scharf; Ränder rund und sauber aus geglätteten Masken; Mähstreifen im Shader
 
