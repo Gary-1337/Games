@@ -1,5 +1,8 @@
 # Golf Adventure – Versionsverlauf
 
+## 0.10.0 – 19.11.2026
+- Untergrund deutlich schärfer: Shader-Splatting mit echten Materialtexturen (Gras, Rough, Sand, Erde – ambientCG, CC0) samt Normal Maps, in jeder Entfernung scharf; Ränder rund und sauber aus geglätteten Masken; Mähstreifen im Shader
+
 ## 0.9.3 – 19.11.2026
 - Größere Schwungleiste (bis 380 px, am Handy deutlich größer), komplett sichtbar
 - Chillige Hintergrundmusik (generiert: Akkordflächen, E-Piano, Bass, Besen, Hall), Option „Musik“
