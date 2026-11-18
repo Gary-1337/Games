@@ -1,5 +1,8 @@
 # Golf Adventure – Versionsverlauf
 
+## 0.9.2 – 19.11.2026
+- Runde Kanten statt Ecken: Fairways, Grüns, Bunker, Abschläge, Wasser und Wege werden geglättet (Chaikin) und als kantengeglättete Pfade gemalt; Testgelände und Range ohne Treppenstufen
+
 ## 0.9.1 – 19.11.2026
 - Gras deutlich schärfer: feine Detailtextur (Halme, Büschel) im Gelände-Shader, Sandkörnung im Bunker, Übergänge weniger verwaschen
 
