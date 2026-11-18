@@ -1,5 +1,9 @@
 # Golf Adventure – Versionsverlauf
 
+## 0.10.3 – 19.11.2026
+- Bäume nach dem Luftbild: rund 11 700 Bäume an ihren echten Standorten (aus dem Orthofoto von basemap.at erkannt, Kronengröße inklusive) statt zufällig verteilter Bäume
+- Bäche nach dem Luftbild nachgezeichnet: geschwungener Verlauf, Wasserspiegel fällt gleichmäßig (keine Stufen), Bachbett mit weichen Ufern
+
 ## 0.10.2 – 19.11.2026
 - Große Karte lässt sich schließen: ✕-Button, Esc, M oder Klick daneben (vorher kam man schwer wieder heraus)
 - Ton aus/an: 🔊-Button oben rechts am Bildschirmrand, Taste N (wird gespeichert)
