@@ -1,5 +1,9 @@
 # Golf Adventure – Versionsverlauf
 
+## 0.10.2 – 19.11.2026
+- Große Karte lässt sich schließen: ✕-Button, Esc, M oder Klick daneben (vorher kam man schwer wieder heraus)
+- Ton aus/an: 🔊-Button oben rechts am Bildschirmrand, Taste N (wird gespeichert)
+
 ## 0.10.1 – 19.11.2026
 - Musik pausiert im Pausemenü (Esc/P/❚❚) und läuft danach weiter
 
